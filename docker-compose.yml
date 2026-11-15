@@ -1,0 +1,17 @@
+services:
+  selene-dev:
+    build: .
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    environment:
+      # Facultatif : sans clé, lancez `claude` et connectez-vous avec votre compte
+      - ANTHROPIC_API_KEY
+      - CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=70
+    volumes:
+      - .:/workspace
+      # Garde la connexion et les réglages de Claude Code entre deux sessions
+      - claude-home:/home/node
+
+volumes:
+  claude-home:

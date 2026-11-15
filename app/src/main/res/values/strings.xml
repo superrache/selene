@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="app_name">Sélène</string>
+
+    <!-- Navigation -->
+    <string name="tab_cycle">Cycle</string>
+    <string name="tab_calendar">Calendrier</string>
+    <string name="tab_analysis">Analyse</string>
+    <string name="tab_settings">Réglages</string>
+    <string name="action_add">Ajouter</string>
+    <string name="action_back">Retour</string>
+    <string name="action_close">Fermer</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="action_undo">Annuler</string>
+    <string name="action_edit">Modifier</string>
+    <string name="action_delete">Supprimer</string>
+    <string name="action_save">Enregistrer</string>
+    <string name="action_continue">Continuer</string>
+    <string name="action_ok">OK</string>
+
+    <!-- Common -->
+    <string name="today">Aujourd’hui</string>
+    <string name="yesterday">Hier</string>
+    <string name="estimate_disclaimer">Estimations calculées sur votre téléphone à partir de votre historique.</string>
+    <plurals name="in_days">
+        <item quantity="one">dans %d jour</item>
+        <item quantity="many">dans %d jours</item>
+        <item quantity="other">dans %d jours</item>
+    </plurals>
+    <plurals name="days_ago">
+        <item quantity="one">il y a %d jour</item>
+        <item quantity="many">il y a %d jours</item>
+        <item quantity="other">il y a %d jours</item>
+    </plurals>
+    <plurals name="margin_days">
+        <item quantity="one">± %d jour</item>
+        <item quantity="many">± %d jours</item>
+        <item quantity="other">± %d jours</item>
+    </plurals>
+    <plurals name="late_days">
+        <item quantity="one">Retard de %d jour</item>
+        <item quantity="many">Retard de %d jours</item>
+        <item quantity="other">Retard de %d jours</item>
+    </plurals>
+    <plurals name="days_count">
+        <item quantity="one">%d jour</item>
+        <item quantity="many">%d jours</item>
+        <item quantity="other">%d jours</item>
+    </plurals>
+    <plurals name="cycles_count">
+        <item quantity="one">%d cycle</item>
+        <item quantity="many">%d cycles</item>
+        <item quantity="other">%d cycles</item>
+    </plurals>
+
+    <!-- Levels -->
+    <string name="flow_label">Flux</string>
+    <string name="flow_1">Léger</string>
+    <string name="flow_2">Moyen</string>
+    <string name="flow_3">Abondant</string>
+    <string name="flow_4">Très abondant</string>
+    <string name="pain_label">Douleur</string>
+    <string name="fatigue_label">Fatigue</string>
+    <string name="level_0">Aucune</string>
+    <string name="level_1">Légère</string>
+    <string name="level_2">Modérée</string>
+    <string name="level_3">Forte</string>
+    <string name="level_4">Très forte</string>
+    <string name="level_value" tools:ignore="PluralsCandidate">%1$d sur 4, %2$s</string>
+    <string name="mood_label">Humeur</string>
+    <string name="mood_required">Humeur (obligatoire)</string>
+    <string name="mood_1">Très mal</string>
+    <string name="mood_2">Mal</string>
+    <string name="mood_3">Neutre</string>
+    <string name="mood_4">Bien</string>
+    <string name="mood_5">Très bien</string>
+
+    <!-- Entry -->
+    <string name="entry_title_add">Ajouter</string>
+    <string name="entry_title_edit">Modifier</string>
+    <string name="entry_date">Date</string>
+    <string name="entry_choose_date">Choisir la date</string>
+    <string name="entry_type">Type</string>
+    <string name="entry_type_period">Règles</string>
+    <string name="entry_type_mood">Humeur</string>
+    <string name="entry_type_event">Événement</string>
+    <string name="entry_event_title">Titre de l’événement</string>
+    <string name="entry_event_hint">Ex. : nuit blanche, voyage, sport intense…</string>
+    <string name="entry_event_counter">%1$d / %2$d</string>
+    <string name="entry_need_mood">Choisissez une humeur pour enregistrer le jour de règles.</string>
+    <string name="entry_need_title">Donnez un titre à l’événement.</string>
+    <string name="entry_replaces_existing">Une saisie existe déjà ce jour-là : elle sera remplacée.</string>
+    <string name="entry_error">L’enregistrement a échoué.</string>
+
+    <!-- Day detail -->
+    <string name="day_nothing">Rien de noté ce jour-là.</string>
+    <string name="day_add">Ajouter à ce jour</string>
+    <string name="day_period_title">Règles · flux %1$s</string>
+    <string name="day_period_detail">Douleur %1$d/4 · Fatigue %2$d/4</string>
+    <string name="day_mood_title">Humeur : %1$s</string>
+    <string name="day_mood_locked">Liée au jour de règles : supprimez les règles pour la retirer.</string>
+    <string name="day_predicted_period">Règles prévues</string>
+    <string name="day_fertile">Fenêtre fertile estimée</string>
+    <string name="day_ovulation">Ovulation estimée</string>
+    <string name="day_future_info">Vous pourrez noter ce jour quand il sera arrivé.</string>
+    <string name="day_delete_period_title">Supprimer ce jour de règles ?</string>
+    <string name="day_delete_period_also_mood">Supprimer aussi l’humeur de ce jour</string>
+    <string name="day_deleted_period">Jour de règles supprimé</string>
+    <string name="day_deleted_mood">Humeur supprimée</string>
+    <string name="day_deleted_event">Événement supprimé</string>
+
+    <!-- Cycle -->
+    <string name="cycle_day">Jour %1$d</string>
+    <string name="cycle_of" tools:ignore="PluralsCandidate">sur %1$d</string>
+    <string name="cycle_empty_title">Bienvenue</string>
+    <string name="cycle_empty_body">Notez le premier jour de vos règles pour voir votre cycle et les premières estimations.</string>
+    <string name="cycle_empty_action">Noter mes règles</string>
+    <string name="cycle_ovulation_card">Ovulation estimée</string>
+    <string name="cycle_next_period_card">Prochaines règles</string>
+    <string name="cycle_late_hint">La date prévue est dépassée : l’estimation est reportée à aujourd’hui.</string>
+    <string name="cycle_legend_period">Règles</string>
+    <string name="cycle_legend_fertile">Fenêtre fertile</string>
+    <string name="cycle_legend_pms">SPM probable</string>
+    <string name="cycle_ring_description" tools:ignore="PluralsCandidate">Cycle en cours : jour %1$d sur %2$d, %3$s. Règles du jour 1 au jour %4$d. Fenêtre fertile du jour %5$d au jour %6$d, ovulation estimée le jour %7$d.%8$s</string>
+    <string name="cycle_ring_pms_description">" SPM probable à partir du jour %1$d."</string>
+    <string name="cycle_ring_empty_description">Anneau du cycle vide : aucune donnée.</string>
+    <string name="phase_menstruation">Règles</string>
+    <string name="phase_follicular">Phase folliculaire</string>
+    <string name="phase_fertile">Fenêtre fertile</string>
+    <string name="phase_ovulation">Ovulation estimée</string>
+    <string name="phase_luteal">Phase lutéale</string>
+    <string name="phase_pms">SPM probable</string>
+    <string name="phase_late">Règles en retard</string>
+    <string name="today_relative">aujourd’hui</string>
+
+    <!-- Calendar -->
+    <string name="calendar_weekdays">L,M,M,J,V,S,D</string>
+    <string name="calendar_today">Aujourd’hui</string>
+    <string name="cal_desc_today">aujourd’hui</string>
+    <string name="cal_desc_period">règles</string>
+    <string name="cal_desc_predicted">règles prévues</string>
+    <string name="cal_desc_fertile">fenêtre fertile</string>
+    <string name="cal_desc_ovulation">ovulation estimée</string>
+    <string name="cal_desc_event">événement remarquable</string>
+    <string name="cal_desc_mood">humeur notée</string>
+    <string name="cal_legend_predicted">Prévues</string>
+    <string name="cal_legend_ovulation">Ovulation</string>
+    <string name="cal_legend_event">Événement</string>
+
+    <!-- Analysis -->
+    <string name="analysis_title">Analyse</string>
+    <string name="analysis_avg_cycle">Cycle moyen</string>
+    <string name="analysis_variability">Variabilité</string>
+    <string name="analysis_period_length">Règles</string>
+    <string name="analysis_value_days">%1$s j</string>
+    <string name="analysis_value_margin">± %1$s j</string>
+    <string name="analysis_defaults_note">Valeurs par défaut (28 j, règles 5 j) : il faut au moins deux cycles complets pour calculer vos statistiques.</string>
+    <string name="analysis_empty">Notez vos règles pendant au moins deux cycles : l’analyse a besoin de deux cycles complets pour calculer votre cycle moyen et sa variabilité.</string>
+    <string name="analysis_cycles_chart">Durée des derniers cycles</string>
+    <string name="analysis_chart_average">moyenne %1$s j</string>
+    <string name="analysis_chart_excluded">Les barres hachurées (moins de 15 j ou plus de 60 j) sont exclues des statistiques : oubli de saisie probable.</string>
+    <string name="analysis_chart_description">Durées des derniers cycles, du plus ancien au plus récent : %1$s. Moyenne %2$s jours.</string>
+    <string name="analysis_chart_item">%1$s%2$s</string>
+    <string name="analysis_chart_item_excluded">" (exclu)"</string>
+    <string name="analysis_forecast">Prévision</string>
+    <string name="analysis_next_period">Prochaines règles</string>
+    <string name="analysis_ovulation">Prochaine ovulation</string>
+    <string name="analysis_fertile_window">Fenêtre fertile</string>
+    <string name="analysis_interval">entre le %1$s et le %2$s</string>
+    <string name="analysis_range">du %1$s au %2$s</string>
+    <string name="analysis_reliability">Fiabilité</string>
+    <string name="reliability_low">Faible</string>
+    <string name="reliability_medium">Moyenne</string>
+    <string name="reliability_good">Bonne</string>
+    <string name="reliability_very_good">Très bonne</string>
+    <string name="analysis_reliability_basis">Basée sur %1$s.</string>
+    <string name="analysis_mood_signal">Signal d’humeur (SPM)</string>
+    <string name="analysis_mood_used">Le signal est utilisé. Il repose sur %3$s (cycles analysés : %4$d), avec une humeur basse environ %5$s j avant les règles. L’humeur basse notée le %1$s a affiné la prévision (estimation statistique seule : %2$s).</string>
+    <string name="analysis_mood_reliable">Le signal est fiable : une humeur basse apparaît environ %1$s j avant les règles, dans %2$s (cycles analysés : %3$d). Il sera utilisé dès qu’une humeur basse sera notée en fin de cycle.</string>
+    <string name="analysis_mood_unreliable">Le signal n’est pas utilisé : une humeur basse apparaît dans les 7 jours avant les règles dans %1$s (cycles analysés : %2$d). Il faut au moins 3 cycles, au moins la moitié des cycles analysés et des écarts réguliers.</string>
+    <string name="analysis_mood_none">Pas encore de signal : notez votre humeur, surtout en fin de cycle. Si une humeur basse revient régulièrement avant les règles, elle servira à affiner la prévision.</string>
+    <string name="analysis_disclaimer">Sélène n’est ni un avis médical ni une méthode de contraception. Les dates affichées sont des estimations, avec leur marge d’incertitude.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Réglages</string>
+    <string name="settings_data">Données</string>
+    <string name="settings_export">Exporter en JSON</string>
+    <string name="settings_export_summary">Une copie de vos données dans un fichier.</string>
+    <string name="settings_import">Importer un fichier JSON</string>
+    <string name="settings_import_summary">Depuis un export Sélène.</string>
+    <string name="settings_export_warning_title">Fichier non chiffré</string>
+    <string name="settings_export_warning">Le fichier exporté ne sera pas chiffré : toute personne qui y a accès pourra lire vos données. Rangez-le en lieu sûr.</string>
+    <string name="settings_export_done">Export terminé</string>
+    <string name="settings_export_failed">L’export a échoué.</string>
+    <string name="settings_import_choose_title">Importer %1$s</string>
+    <string name="settings_import_choose">Fusionner : pour chaque jour présent dans le fichier, le fichier l’emporte. Remplacer tout : vos données actuelles sont effacées puis remplacées par le fichier.</string>
+    <string name="settings_import_merge">Fusionner</string>
+    <string name="settings_import_replace">Remplacer tout</string>
+    <string name="settings_import_done">Import terminé</string>
+    <string name="settings_import_error_title">Import impossible</string>
+    <string name="settings_import_error_footer">Aucune donnée n’a été modifiée.</string>
+    <string name="settings_calendar">Calendrier Android</string>
+    <string name="settings_calendar_sync">Synchroniser les prochaines règles</string>
+    <string name="settings_calendar_sync_summary">Un seul événement, sur les prochaines règles estimées.</string>
+    <string name="settings_calendar_permission_denied">Sans l’accès au calendrier, la synchronisation ne peut pas être activée.</string>
+    <string name="settings_calendar_choose">Choisir le calendrier</string>
+    <string name="settings_calendar_create_local">Créer un calendrier local « Sélène »</string>
+    <string name="settings_calendar_local_badge">Local, reste sur le téléphone</string>
+    <string name="settings_calendar_account_badge">Compte %1$s : synchronisé vers un serveur</string>
+    <string name="settings_calendar_account_warning_title">Calendrier synchronisé</string>
+    <string name="settings_calendar_account_warning">Ce calendrier appartient au compte %1$s : l’événement sera envoyé à ce serveur. Un calendrier local reste sur votre téléphone. Utiliser quand même ce calendrier ?</string>
+    <string name="settings_calendar_selected">Calendrier : %1$s</string>
+    <string name="settings_calendar_event_title">Titre de l’événement</string>
+    <string name="settings_calendar_no_calendar">Aucun calendrier modifiable trouvé.</string>
+    <string name="settings_calendar_local_name">Sélène</string>
+    <string name="calendar_default_event_title">Période de règles</string>
+    <string name="settings_security">Sécurité</string>
+    <string name="settings_encryption">Chiffrement</string>
+    <string name="settings_encryption_on">Base chiffrée (SQLCipher, AES-256). Clé protégée par le Keystore Android, jamais sauvegardée ni exportée.</string>
+    <string name="settings_offline_title">Hors ligne</string>
+    <string name="settings_offline">L’application n’a pas accès à Internet : vos données ne quittent jamais le téléphone, sauf export de votre part.</string>
+    <string name="settings_biometric">Verrouillage biométrique</string>
+    <string name="settings_biometric_summary">Demander l’empreinte, le visage ou le code de l’appareil à l’ouverture.</string>
+    <string name="settings_biometric_unavailable">Aucune méthode de déverrouillage configurée sur cet appareil.</string>
+    <string name="settings_erase">Effacer toutes les données</string>
+    <string name="settings_erase_summary">Règles, humeurs, événements et réglages.</string>
+    <string name="settings_erase_confirm1_title">Effacer toutes les données ?</string>
+    <string name="settings_erase_confirm1">Toutes vos saisies seront supprimées de ce téléphone. Pensez à exporter vos données avant.</string>
+    <string name="settings_erase_confirm2_title">Dernière confirmation</string>
+    <string name="settings_erase_confirm2">Cette action est définitive et ne peut pas être annulée.</string>
+    <string name="settings_erase_action">Tout effacer</string>
+    <string name="settings_erase_done">Toutes les données ont été effacées.</string>
+    <string name="settings_about">À propos</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="settings_licenses">Polices Space Grotesk et Inter, sous licence SIL Open Font License 1.1.</string>
+
+    <!-- Import errors -->
+    <string name="import_error_unreadable">Le fichier n’a pas pu être lu.</string>
+    <string name="import_error_too_large">Le fichier est trop volumineux pour être un export Sélène.</string>
+    <string name="import_error_not_json">Le fichier n’est pas un JSON valide.</string>
+    <string name="import_error_format">Ce fichier n’est pas un export Sélène (champ « format » absent ou différent de « selene-export »).</string>
+    <string name="import_error_version_missing">La version du format est absente ou invalide.</string>
+    <string name="import_error_version_unsupported">Ce fichier utilise la version %1$d du format, plus récente que celle que cette version de l’application sait lire (%2$d). Mettez l’application à jour.</string>
+    <string name="import_error_structure">Structure du fichier invalide : %1$s</string>
+    <string name="import_error_date">Jour n° %1$d : date « %2$s » invalide (format attendu AAAA-MM-JJ).</string>
+    <string name="import_error_duplicate_date">Le jour %1$s apparaît plusieurs fois.</string>
+    <string name="import_error_range">%1$s : %2$s vaut %3$d, valeur attendue entre %4$d et %5$d.</string>
+    <string name="import_error_period_without_mood">%1$s : un jour de règles doit avoir une humeur.</string>
+    <string name="import_error_event_title">%1$s : titre d’événement vide ou de plus de 80 caractères.</string>
+    <string name="import_error_event_id">%1$s : identifiant d’événement absent ou en double (« %2$s »).</string>
+    <string name="import_field_flow">le flux</string>
+    <string name="import_field_pain">la douleur</string>
+    <string name="import_field_fatigue">la fatigue</string>
+    <string name="import_field_mood">l’humeur</string>
+
+    <!-- Lock -->
+    <string name="lock_title">Sélène est verrouillée</string>
+    <string name="lock_unlock">Déverrouiller</string>
+    <string name="lock_prompt_title">Déverrouiller Sélène</string>
+    <string name="lock_prompt_enable">Activer le verrouillage</string>
+
+    <!-- Errors -->
+    <string name="db_error_title">Données inaccessibles</string>
+    <string name="db_error_body">La clé de chiffrement de vos données est introuvable sur cet appareil. Les données ne peuvent pas être déchiffrées. Vous pouvez repartir de zéro (les données actuelles seront effacées) puis importer un export.</string>
+    <string name="db_error_reset">Repartir de zéro</string>
+</resources>
