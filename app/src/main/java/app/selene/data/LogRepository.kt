@@ -2,14 +2,16 @@ package app.selene.data
 
 import androidx.room.withTransaction
 import app.selene.data.db.LogDao
-import app.selene.data.db.MoodLogEntity
 import app.selene.data.db.NotableEventEntity
 import app.selene.data.db.PeriodLogEntity
 import app.selene.data.db.SeleneDatabase
+import app.selene.data.db.SymptomLogEntity
 import app.selene.domain.model.DayLog
 import app.selene.domain.model.Mood
 import app.selene.domain.model.NotableEvent
 import app.selene.domain.model.PeriodLog
+import app.selene.domain.model.Symptom
+import app.selene.domain.model.SymptomLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -17,13 +19,7 @@ import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.util.UUID
 
-/** Thrown when a write would leave a period day without a mood. */
-class MoodInvariantException(message: String) : IllegalStateException(message)
-
-/**
- * The only entry point to the logs. Enforces the central invariant
- * "a period day always has a mood" for every write, whatever the caller.
- */
+/** The only entry point to the logs. */
 class LogRepository(private val db: SeleneDatabase) {
     private val dao: LogDao = db.logDao()
 
@@ -31,56 +27,49 @@ class LogRepository(private val db: SeleneDatabase) {
 
     /** All logged days, sorted by date. */
     val days: Flow<List<DayLog>> =
-        combine(dao.observePeriods(), dao.observeMoods(), dao.observeEvents(), ::assemble)
+        combine(dao.observePeriods(), dao.observeSymptoms(), dao.observeEvents(), ::assemble)
 
     fun day(date: LocalDate): Flow<DayLog> =
         days.map { all -> all.firstOrNull { it.date == date } ?: DayLog(date) }.distinctUntilChanged()
 
     suspend fun snapshot(): List<DayLog> = db.withTransaction {
-        assemble(dao.allPeriods(), dao.allMoods(), dao.allEvents())
+        assemble(dao.allPeriods(), dao.allSymptoms(), dao.allEvents())
     }
 
     suspend fun getDay(date: LocalDate): DayLog = db.withTransaction {
         DayLog(
             date = date,
             period = dao.period(date)?.toDomain(),
-            mood = dao.mood(date)?.let { Mood.fromValue(it.mood) },
+            symptoms = dao.symptoms(date)?.toDomain(),
             events = dao.events(date).map { it.toDomain() },
         )
     }
 
-    // --- Period & mood ---------------------------------------------------------------------------
+    // --- Period ----------------------------------------------------------------------------------
 
-    /** Writes a period day and its (mandatory) mood in one transaction. */
-    suspend fun savePeriodDay(period: PeriodLog, mood: Mood) {
-        db.withTransaction {
-            dao.upsertPeriod(period.toEntity())
-            dao.upsertMood(MoodLogEntity(period.date, mood.value))
-        }
+    suspend fun savePeriod(period: PeriodLog) {
+        dao.upsertPeriod(period.toEntity())
     }
 
-    suspend fun saveMood(date: LocalDate, mood: Mood) {
-        dao.upsertMood(MoodLogEntity(date, mood.value))
-    }
-
-    /** Deletes a mood alone. Refused on a period day: delete the period day instead. */
-    suspend fun deleteMood(date: LocalDate): DayLog = db.withTransaction {
-        if (dao.period(date) != null) throw MoodInvariantException("a period day must keep its mood")
-        val before = dao.mood(date)?.let { Mood.fromValue(it.mood) }
-        dao.deleteMood(date)
-        DayLog(date, mood = before)
-    }
-
-    /**
-     * Deletes a period day, and its mood when [alsoDeleteMood] (default: yes).
-     * Returns what was deleted, to be passed to [restore] for "undo".
-     */
-    suspend fun deletePeriodDay(date: LocalDate, alsoDeleteMood: Boolean = true): DayLog = db.withTransaction {
+    /** Deletes a period day. Returns what was deleted, to be passed to [restore] for "undo". */
+    suspend fun deletePeriod(date: LocalDate): DayLog = db.withTransaction {
         val period = dao.period(date)?.toDomain()
-        val mood = dao.mood(date)?.let { Mood.fromValue(it.mood) }
         dao.deletePeriod(date)
-        if (alsoDeleteMood) dao.deleteMood(date)
-        DayLog(date, period = period, mood = if (alsoDeleteMood) mood else null)
+        DayLog(date, period = period)
+    }
+
+    // --- Symptoms of the day ---------------------------------------------------------------------
+
+    /** Replaces the symptoms of the day; an empty record deletes them. */
+    suspend fun saveSymptoms(symptoms: SymptomLog) {
+        val normalized = symptoms.copy(note = SymptomLog.normalizeNote(symptoms.note))
+        if (normalized.isEmpty) dao.deleteSymptoms(symptoms.date) else dao.upsertSymptoms(normalized.toEntity())
+    }
+
+    suspend fun deleteSymptoms(date: LocalDate): DayLog = db.withTransaction {
+        val before = dao.symptoms(date)?.toDomain()
+        dao.deleteSymptoms(date)
+        DayLog(date, symptoms = before)
     }
 
     // --- Notable events --------------------------------------------------------------------------
@@ -104,14 +93,11 @@ class LogRepository(private val db: SeleneDatabase) {
 
     // --- Undo / import ---------------------------------------------------------------------------
 
-    /** Re-inserts what a delete returned. Keeps the invariant: a period is only restored with a mood. */
+    /** Re-inserts what a delete returned. */
     suspend fun restore(deleted: DayLog) {
         db.withTransaction {
-            deleted.mood?.let { dao.upsertMood(MoodLogEntity(deleted.date, it.value)) }
-            deleted.period?.let {
-                if (dao.mood(deleted.date) == null) throw MoodInvariantException("cannot restore a period without mood")
-                dao.upsertPeriod(it.toEntity())
-            }
+            deleted.symptoms?.let { dao.upsertSymptoms(it.toEntity()) }
+            deleted.period?.let { dao.upsertPeriod(it.toEntity()) }
             deleted.events.forEach { dao.upsertEvent(it.toEntity()) }
         }
     }
@@ -119,22 +105,20 @@ class LogRepository(private val db: SeleneDatabase) {
     /**
      * Writes imported days in one transaction. MERGE: for each day of [days], the file wins
      * (the day is replaced as a whole). REPLACE_ALL: everything is deleted first.
-     * Callers must validate first; the invariant is checked again here before writing anything.
+     * Callers must validate first (see [app.selene.data.json.JsonImport]).
      */
     suspend fun import(days: List<DayLog>, mode: ImportMode) {
-        val broken = days.firstOrNull { !it.respectsMoodInvariant }
-        if (broken != null) throw MoodInvariantException("period day without mood: ${broken.date}")
         require(days.map { it.date }.toSet().size == days.size) { "duplicate days" }
         db.withTransaction {
             if (mode == ImportMode.REPLACE_ALL) clearLogs()
             for (day in days) {
                 if (mode == ImportMode.MERGE) {
                     dao.deletePeriod(day.date)
-                    dao.deleteMood(day.date)
+                    dao.deleteSymptoms(day.date)
                     dao.deleteEventsOn(day.date)
                 }
             }
-            dao.upsertMoods(days.mapNotNull { d -> d.mood?.let { MoodLogEntity(d.date, it.value) } })
+            dao.upsertSymptomLogs(days.mapNotNull { it.symptoms?.toEntity() })
             dao.upsertPeriods(days.mapNotNull { it.period?.toEntity() })
             dao.upsertEvents(days.flatMap { d -> d.events.map { it.toEntity() } })
         }
@@ -147,7 +131,7 @@ class LogRepository(private val db: SeleneDatabase) {
     private suspend fun clearLogs() {
         dao.deleteAllEvents()
         dao.deleteAllPeriods()
-        dao.deleteAllMoods()
+        dao.deleteAllSymptoms()
     }
 
     companion object {
@@ -159,18 +143,18 @@ class LogRepository(private val db: SeleneDatabase) {
 
         internal fun assemble(
             periods: List<PeriodLogEntity>,
-            moods: List<MoodLogEntity>,
+            symptoms: List<SymptomLogEntity>,
             events: List<NotableEventEntity>,
         ): List<DayLog> {
             val periodBy = periods.associateBy { it.date }
-            val moodBy = moods.associateBy { it.date }
+            val symptomsBy = symptoms.associateBy { it.date }
             val eventsBy = events.groupBy { it.date }
-            val dates = (periodBy.keys + moodBy.keys + eventsBy.keys).toSortedSet()
+            val dates = (periodBy.keys + symptomsBy.keys + eventsBy.keys).toSortedSet()
             return dates.map { date ->
                 DayLog(
                     date = date,
                     period = periodBy[date]?.let { runCatching { it.toDomain() }.getOrNull() },
-                    mood = moodBy[date]?.let { Mood.fromValue(it.mood) },
+                    symptoms = symptomsBy[date]?.toDomain(),
                     events = eventsBy[date].orEmpty().mapNotNull { runCatching { it.toDomain() }.getOrNull() },
                 )
             }
@@ -178,7 +162,31 @@ class LogRepository(private val db: SeleneDatabase) {
     }
 }
 
-private fun PeriodLogEntity.toDomain() = PeriodLog(date, flow, pain, fatigue)
-private fun PeriodLog.toEntity() = PeriodLogEntity(date, flow, pain, fatigue)
+private fun PeriodLogEntity.toDomain() = PeriodLog(date, flow, pain)
+private fun PeriodLog.toEntity() = PeriodLogEntity(date, flow, pain)
 private fun NotableEventEntity.toDomain() = NotableEvent(id, date, title)
 private fun NotableEvent.toEntity() = NotableEventEntity(id, date, title)
+
+private fun String.codes(): List<String> = split(',').filter { it.isNotEmpty() }
+
+/** Lenient read: unknown codes and out-of-range values are dropped rather than crashing. Null when nothing is left. */
+private fun SymptomLogEntity.toDomain(): SymptomLog? = runCatching {
+    SymptomLog(
+        date = date,
+        moods = moods.codes().mapNotNull(Mood::fromCode).toSet(),
+        symptoms = symptoms.codes().mapNotNull(Symptom::fromCode).toSet(),
+        irritability = irritability?.takeIf { it in SymptomLog.LEVEL_RANGE },
+        fatigue = fatigue?.takeIf { it in SymptomLog.LEVEL_RANGE },
+        note = SymptomLog.normalizeNote(note),
+    )
+}.getOrNull()?.takeIf { !it.isEmpty }
+
+private fun SymptomLog.toEntity() = SymptomLogEntity(
+    date = date,
+    // Stored in declaration order, so equal sets give equal rows.
+    moods = Mood.entries.filter { it in moods }.joinToString(",") { it.code },
+    symptoms = Symptom.entries.filter { it in symptoms }.joinToString(",") { it.code },
+    irritability = irritability,
+    fatigue = fatigue,
+    note = note,
+)

@@ -1,12 +1,14 @@
 package app.selene.data
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import app.selene.data.db.MoodLogEntity
 import app.selene.data.db.SeleneDatabase
+import app.selene.data.db.SymptomLogEntity
 import app.selene.domain.model.DayLog
 import app.selene.domain.model.Mood
 import app.selene.domain.model.NotableEvent
 import app.selene.domain.model.PeriodLog
+import app.selene.domain.model.Symptom
+import app.selene.domain.model.SymptomLog
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -25,6 +27,15 @@ class LogRepositoryTest {
     private lateinit var repo: LogRepository
     private val day = LocalDate.of(2026, 11, 9)
 
+    private fun symptoms(date: LocalDate = day) = SymptomLog(
+        date = date,
+        moods = setOf(Mood.SAD, Mood.ANXIOUS),
+        symptoms = setOf(Symptom.CRAMPS, Symptom.NAUSEA, Symptom.SPOTTING),
+        irritability = 3,
+        fatigue = 0,
+        note = "Mal au genou",
+    )
+
     @Before
     fun setUp() {
         db = inMemoryDatabase()
@@ -35,56 +46,58 @@ class LogRepositoryTest {
     fun tearDown() = db.close()
 
     @Test
-    fun savingAPeriodDayWritesPeriodAndMoodTogether() = runTest {
-        repo.savePeriodDay(PeriodLog(day, 2, 2, 3), Mood.BAD)
+    fun aPeriodDayNoLongerNeedsAMood() = runTest {
+        repo.savePeriod(PeriodLog(day, 2, 3))
         val d = repo.getDay(day)
-        assertEquals(PeriodLog(day, 2, 2, 3), d.period)
-        assertEquals(Mood.BAD, d.mood)
+        assertEquals(PeriodLog(day, 2, 3), d.period)
+        assertNull(d.symptoms)
         assertEquals(listOf(d), repo.days.first())
     }
 
     @Test
-    fun theMoodOfAPeriodDayCanBeChangedButNotDeletedAlone() = runTest {
-        repo.savePeriodDay(PeriodLog(day, 2, 0, 0), Mood.BAD)
-        repo.saveMood(day, Mood.GOOD)
-        assertEquals(Mood.GOOD, repo.getDay(day).mood)
-        assertFailsWith<MoodInvariantException> { repo.deleteMood(day) }
-        assertEquals(Mood.GOOD, repo.getDay(day).mood)
+    fun symptomsAreSavedReadAndReplaced() = runTest {
+        repo.saveSymptoms(symptoms())
+        assertEquals(symptoms(), repo.getDay(day).symptoms)
+        val changed = SymptomLog(day, moods = setOf(Mood.JOYFUL), symptoms = setOf(Symptom.HIGH_LIBIDO))
+        repo.saveSymptoms(changed)
+        assertEquals(changed, repo.getDay(day).symptoms)
     }
 
     @Test
-    fun aMoodAloneCanBeDeleted() = runTest {
-        repo.saveMood(day, Mood.NEUTRAL)
-        val deleted = repo.deleteMood(day)
-        assertNull(repo.getDay(day).mood)
-        repo.restore(deleted)
-        assertEquals(Mood.NEUTRAL, repo.getDay(day).mood)
+    fun theNoteIsTrimmedAndBlankNotesAreDropped() = runTest {
+        repo.saveSymptoms(SymptomLog(day, moods = setOf(Mood.GOOD), note = "  Migraine ophtalmique  "))
+        assertEquals("Migraine ophtalmique", repo.getDay(day).symptoms?.note)
+        assertFailsWith<IllegalArgumentException> { SymptomLog(day, note = "   ") }
+        assertEquals(null, SymptomLog.normalizeNote("   "))
     }
 
     @Test
-    fun deletingAPeriodDayDeletesItsMoodByDefaultAndCanBeUndone() = runTest {
-        repo.savePeriodDay(PeriodLog(day, 3, 1, 1), Mood.VERY_BAD)
-        val deleted = repo.deletePeriodDay(day)
+    fun savingEmptySymptomsDeletesThem() = runTest {
+        repo.saveSymptoms(symptoms())
+        repo.saveSymptoms(SymptomLog(day))
         assertTrue(repo.getDay(day).isEmpty)
-        repo.restore(deleted)
-        assertEquals(PeriodLog(day, 3, 1, 1), repo.getDay(day).period)
-        assertEquals(Mood.VERY_BAD, repo.getDay(day).mood)
     }
 
     @Test
-    fun deletingAPeriodDayCanKeepTheMood() = runTest {
-        repo.savePeriodDay(PeriodLog(day, 3, 1, 1), Mood.VERY_BAD)
-        val deleted = repo.deletePeriodDay(day, alsoDeleteMood = false)
+    fun symptomsCanBeDeletedAndRestoredIndependentlyOfThePeriod() = runTest {
+        repo.savePeriod(PeriodLog(day, 3, 1))
+        repo.saveSymptoms(symptoms())
+        val deleted = repo.deleteSymptoms(day)
+        assertNull(repo.getDay(day).symptoms)
+        assertEquals(PeriodLog(day, 3, 1), repo.getDay(day).period)
+        repo.restore(deleted)
+        assertEquals(symptoms(), repo.getDay(day).symptoms)
+    }
+
+    @Test
+    fun deletingAPeriodDayKeepsTheSymptomsAndCanBeUndone() = runTest {
+        repo.savePeriod(PeriodLog(day, 3, 1))
+        repo.saveSymptoms(symptoms())
+        val deleted = repo.deletePeriod(day)
         assertNull(repo.getDay(day).period)
-        assertEquals(Mood.VERY_BAD, repo.getDay(day).mood)
+        assertEquals(symptoms(), repo.getDay(day).symptoms)
         repo.restore(deleted)
-        assertEquals(PeriodLog(day, 3, 1, 1), repo.getDay(day).period)
-    }
-
-    @Test
-    fun aPeriodCannotBeRestoredWithoutMood() = runTest {
-        assertFailsWith<MoodInvariantException> { repo.restore(DayLog(day, period = PeriodLog(day, 1, 0, 0))) }
-        assertTrue(repo.getDay(day).isEmpty)
+        assertEquals(PeriodLog(day, 3, 1), repo.getDay(day).period)
     }
 
     @Test
@@ -109,45 +122,41 @@ class LogRepositoryTest {
     }
 
     @Test
-    fun importRefusesPeriodDaysWithoutMoodAndWritesNothing() = runTest {
-        repo.saveMood(day, Mood.GOOD)
-        val other = day.plusDays(1)
-        val bad = listOf(
-            DayLog(other, mood = Mood.BAD),
-            DayLog(other.plusDays(1), period = PeriodLog(other.plusDays(1), 1, 0, 0)),
-        )
-        assertFailsWith<MoodInvariantException> { repo.import(bad, LogRepository.ImportMode.REPLACE_ALL) }
-        assertEquals(listOf(DayLog(day, mood = Mood.GOOD)), repo.snapshot())
-    }
-
-    @Test
     fun importMergeLetsTheFileWinDayByDay() = runTest {
-        repo.savePeriodDay(PeriodLog(day, 2, 0, 0), Mood.BAD)
+        repo.savePeriod(PeriodLog(day, 2, 0))
+        repo.saveSymptoms(symptoms())
         repo.addEvent(day, "Ancien")
-        repo.saveMood(day.plusDays(5), Mood.GOOD)
-        val fileDay = DayLog(day, mood = Mood.VERY_GOOD, events = listOf(NotableEvent("e1", day, "Nouveau")))
+        repo.saveSymptoms(SymptomLog(day.plusDays(5), moods = setOf(Mood.GOOD)))
+        val fileDay = DayLog(
+            day,
+            symptoms = SymptomLog(day, moods = setOf(Mood.JOYFUL)),
+            events = listOf(NotableEvent("e1", day, "Nouveau")),
+        )
         repo.import(listOf(fileDay), LogRepository.ImportMode.MERGE)
         assertEquals(fileDay, repo.getDay(day))
-        assertEquals(Mood.GOOD, repo.getDay(day.plusDays(5)).mood)
+        assertEquals(setOf(Mood.GOOD), repo.getDay(day.plusDays(5)).moods)
     }
 
     @Test
     fun importReplaceAllRemovesEverythingElse() = runTest {
-        repo.saveMood(day.plusDays(5), Mood.GOOD)
-        val fileDay = DayLog(day, period = PeriodLog(day, 4, 4, 4), mood = Mood.VERY_BAD)
+        repo.saveSymptoms(SymptomLog(day.plusDays(5), moods = setOf(Mood.GOOD)))
+        val fileDay = DayLog(day, period = PeriodLog(day, 4, 4), symptoms = symptoms())
         repo.import(listOf(fileDay), LogRepository.ImportMode.REPLACE_ALL)
         assertEquals(listOf(fileDay), repo.snapshot())
     }
 
     @Test
-    fun corruptedRowsAreSkippedWhenReading() = runTest {
-        db.logDao().upsertMood(MoodLogEntity(day, 9))
-        assertNull(repo.getDay(day).mood)
+    fun unknownCodesAndOutOfRangeValuesAreSkippedWhenReading() = runTest {
+        db.logDao().upsertSymptoms(SymptomLogEntity(day, "sad,unknown", "cramps,???", 9, 2, null))
+        assertEquals(SymptomLog(day, setOf(Mood.SAD), setOf(Symptom.CRAMPS), null, 2, null), repo.getDay(day).symptoms)
+        db.logDao().upsertSymptoms(SymptomLogEntity(day, "unknown", "", null, null, "  "))
+        assertNull(repo.getDay(day).symptoms)
     }
 
     @Test
     fun deleteAllClearsLogs() = runTest {
-        repo.savePeriodDay(PeriodLog(day, 2, 0, 0), Mood.BAD)
+        repo.savePeriod(PeriodLog(day, 2, 0))
+        repo.saveSymptoms(symptoms())
         repo.addEvent(day, "Test")
         repo.deleteAll()
         assertTrue(repo.snapshot().isEmpty())

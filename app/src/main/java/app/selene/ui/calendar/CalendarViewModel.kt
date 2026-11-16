@@ -22,7 +22,7 @@ data class CalendarUiState(
     val fertileDays: Set<LocalDate> = emptySet(),
     val ovulationDays: Set<LocalDate> = emptySet(),
     val eventDays: Set<LocalDate> = emptySet(),
-    val moodDays: Set<LocalDate> = emptySet(),
+    val symptomDays: Set<LocalDate> = emptySet(),
 ) {
     val currentMonthIndex: Int get() = months.indexOf(YearMonth.from(today)).coerceAtLeast(0)
 
@@ -51,7 +51,7 @@ data class CalendarUiState(
                 fertileDays = fertile,
                 ovulationDays = ovulation,
                 eventDays = days.filter { it.events.isNotEmpty() }.map { it.date }.toSet(),
-                moodDays = days.filter { it.mood != null }.map { it.date }.toSet(),
+                symptomDays = days.filter { it.symptoms != null }.map { it.date }.toSet(),
             )
         }
     }

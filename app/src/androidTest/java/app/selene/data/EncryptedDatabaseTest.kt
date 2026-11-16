@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.selene.data.db.DatabaseKeyStore
 import app.selene.data.db.SeleneDatabase
 import app.selene.domain.model.Mood
+import app.selene.domain.model.SymptomLog
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Test
@@ -33,7 +34,7 @@ class EncryptedDatabaseTest {
     fun databaseDoesNotOpenWithoutTheKey() = runTest {
         val key = Random.nextBytes(32)
         SeleneDatabase.openEncrypted(context, key, dbName).apply {
-            LogRepository(this).saveMood(day, Mood.GOOD)
+            LogRepository(this).saveSymptoms(SymptomLog(day, moods = setOf(Mood.GOOD)))
             close()
         }
         val wrongKey = Random.nextBytes(32)
@@ -42,14 +43,14 @@ class EncryptedDatabaseTest {
         wrong.close()
 
         val right = SeleneDatabase.openEncrypted(context, key, dbName)
-        assertEquals(Mood.GOOD, LogRepository(right).getDay(day).mood)
+        assertEquals(setOf(Mood.GOOD), LogRepository(right).getDay(day).moods)
         right.close()
     }
 
     @Test
     fun databaseFileIsNotPlainSqlite() = runTest {
         SeleneDatabase.openEncrypted(context, Random.nextBytes(32), dbName).apply {
-            LogRepository(this).saveMood(day, Mood.GOOD)
+            LogRepository(this).saveSymptoms(SymptomLog(day, moods = setOf(Mood.GOOD)))
             close()
         }
         val header = context.getDatabasePath(dbName).readBytes().copyOfRange(0, 16)

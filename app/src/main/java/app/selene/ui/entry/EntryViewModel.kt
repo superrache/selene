@@ -6,6 +6,8 @@ import app.selene.data.LogRepository
 import app.selene.domain.model.Mood
 import app.selene.domain.model.NotableEvent
 import app.selene.domain.model.PeriodLog
+import app.selene.domain.model.Symptom
+import app.selene.domain.model.SymptomLog
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +16,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-enum class EntryKind { PERIOD, MOOD, EVENT }
+enum class EntryKind { PERIOD, SYMPTOMS, EVENT }
 
 data class EntryUiState(
     val isEdit: Boolean,
@@ -23,12 +25,15 @@ data class EntryUiState(
     val kind: EntryKind,
     val flow: Int = DEFAULT_FLOW,
     val pain: Int = 0,
-    val fatigue: Int = 0,
-    val mood: Mood? = null,
+    val moods: Set<Mood> = emptySet(),
+    val symptoms: Set<Symptom> = emptySet(),
+    val irritability: Int? = null,
+    val fatigue: Int? = null,
+    val note: String = "",
     val title: String = "",
     val eventId: String? = null,
     val existingPeriod: Boolean = false,
-    val existingMood: Boolean = false,
+    val existingSymptoms: Boolean = false,
     val saving: Boolean = false,
     val done: Boolean = false,
     val error: Boolean = false,
@@ -37,12 +42,18 @@ data class EntryUiState(
 
     val canSave: Boolean
         get() = !saving && !date.isAfter(today) && when (kind) {
-            EntryKind.PERIOD, EntryKind.MOOD -> mood != null
+            EntryKind.PERIOD -> true
+            // An empty sheet is only useful to clear symptoms that exist.
+            EntryKind.SYMPTOMS -> !symptomLog.isEmpty || existingSymptoms
             EntryKind.EVENT -> titleValid
         }
 
+    val symptomLog: SymptomLog
+        get() = SymptomLog(date, moods, symptoms, irritability, fatigue, SymptomLog.normalizeNote(note))
+
+    /** Only for periods: the symptom sheet is pre-filled with the day's symptoms, so it edits them. */
     val replacesExisting: Boolean
-        get() = !isEdit && ((kind == EntryKind.PERIOD && existingPeriod) || (kind == EntryKind.MOOD && existingMood))
+        get() = !isEdit && kind == EntryKind.PERIOD && existingPeriod
 
     companion object {
         const val DEFAULT_FLOW = 2
@@ -91,8 +102,11 @@ class EntryViewModel(
 
     fun setFlow(flow: Int) = _state.update { it.copy(flow = flow) }
     fun setPain(level: Int) = _state.update { it.copy(pain = level) }
-    fun setFatigue(level: Int) = _state.update { it.copy(fatigue = level) }
-    fun setMood(mood: Mood) = _state.update { it.copy(mood = mood) }
+    fun toggleMood(mood: Mood) = _state.update { it.copy(moods = it.moods.toggle(mood)) }
+    fun toggleSymptom(symptom: Symptom) = _state.update { it.copy(symptoms = it.symptoms.toggle(symptom)) }
+    fun setIrritability(level: Int?) = _state.update { it.copy(irritability = level) }
+    fun setFatigue(level: Int?) = _state.update { it.copy(fatigue = level) }
+    fun setNote(note: String) = _state.update { it.copy(note = note.take(SymptomLog.NOTE_MAX_LENGTH)) }
     fun setTitle(title: String) = _state.update { it.copy(title = title.take(NotableEvent.TITLE_MAX_LENGTH)) }
 
     private fun load() {
@@ -101,15 +115,22 @@ class EntryViewModel(
             val s = _state.value
             val day = repository.getDay(s.date)
             _state.update { current ->
-                var next = current.copy(existingPeriod = day.period != null, existingMood = day.mood != null)
+                var next = current.copy(existingPeriod = day.period != null, existingSymptoms = day.symptoms != null)
                 when (current.kind) {
                     EntryKind.PERIOD -> next = next.copy(
                         flow = day.period?.flow ?: EntryUiState.DEFAULT_FLOW,
                         pain = day.period?.pain ?: 0,
-                        fatigue = day.period?.fatigue ?: 0,
-                        mood = day.mood,
                     )
-                    EntryKind.MOOD -> next = next.copy(mood = day.mood)
+                    EntryKind.SYMPTOMS -> {
+                        val s = day.symptoms
+                        next = next.copy(
+                            moods = s?.moods.orEmpty(),
+                            symptoms = s?.symptoms.orEmpty(),
+                            irritability = s?.irritability,
+                            fatigue = s?.fatigue,
+                            note = s?.note.orEmpty(),
+                        )
+                    }
                     EntryKind.EVENT -> {
                         val event = current.eventId?.let { id -> day.events.firstOrNull { it.id == id } }
                         if (event != null) next = next.copy(title = event.title)
@@ -127,8 +148,8 @@ class EntryViewModel(
         viewModelScope.launch {
             val result = runCatching {
                 when (s.kind) {
-                    EntryKind.PERIOD -> repository.savePeriodDay(PeriodLog(s.date, s.flow, s.pain, s.fatigue), s.mood!!)
-                    EntryKind.MOOD -> repository.saveMood(s.date, s.mood!!)
+                    EntryKind.PERIOD -> repository.savePeriod(PeriodLog(s.date, s.flow, s.pain))
+                    EntryKind.SYMPTOMS -> repository.saveSymptoms(s.symptomLog)
                     EntryKind.EVENT ->
                         if (s.eventId != null) repository.updateEvent(s.eventId, s.title) else repository.addEvent(s.date, s.title)
                 }
@@ -137,5 +158,7 @@ class EntryViewModel(
         }
     }
 }
+
+private fun <T> Set<T>.toggle(item: T): Set<T> = if (item in this) this - item else this + item
 
 private fun LocalDate.coerceAtMost(max: LocalDate, allowFuture: Boolean) = if (!allowFuture && isAfter(max)) max else this

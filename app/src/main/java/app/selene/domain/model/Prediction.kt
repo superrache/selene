@@ -19,9 +19,9 @@ data class CycleStats(
 
 /** PMS signal: first low-mood day in the 7 days before each past period. */
 data class PmsSignal(
-    /** Past cycles that have at least one mood entry in the 7 days before the next period. */
+    /** Past cycles that have at least one mood or irritability entry in the 7 days before the next period. */
     val cyclesAnalyzed: Int,
-    /** Cycles among those with a low mood (≤ 2) in that window. */
+    /** Cycles among those with a low-mood day ([SymptomLog.isPmsSignalDay]) in that window. */
     val cyclesWithSignal: Int,
     /** Median gap, in days, between the first low mood and the period start. */
     val medianOffsetDays: Double?,

@@ -10,6 +10,8 @@ import app.selene.R
 import app.selene.domain.model.CyclePhase
 import app.selene.domain.model.Mood
 import app.selene.domain.model.Reliability
+import app.selene.domain.model.Symptom
+import app.selene.domain.model.SymptomCategory
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -75,11 +77,60 @@ fun relativeDays(today: LocalDate, date: LocalDate): String {
 
 @StringRes
 fun Mood.labelRes(): Int = when (this) {
-    Mood.VERY_BAD -> R.string.mood_1
-    Mood.BAD -> R.string.mood_2
-    Mood.NEUTRAL -> R.string.mood_3
-    Mood.GOOD -> R.string.mood_4
-    Mood.VERY_GOOD -> R.string.mood_5
+    Mood.JOYFUL -> R.string.mood_joyful
+    Mood.GOOD -> R.string.mood_good
+    Mood.NEUTRAL -> R.string.mood_neutral
+    Mood.ANNOYED -> R.string.mood_annoyed
+    Mood.SAD -> R.string.mood_sad
+    Mood.DRAINED -> R.string.mood_drained
+    Mood.FRAGILE -> R.string.mood_fragile
+    Mood.CRYING -> R.string.mood_crying
+    Mood.ANXIOUS -> R.string.mood_anxious
+}
+
+@StringRes
+fun SymptomCategory.labelRes(): Int = when (this) {
+    SymptomCategory.PAIN -> R.string.symptom_category_pain
+    SymptomCategory.SEX -> R.string.symptom_category_sex
+    SymptomCategory.SKIN -> R.string.symptom_category_skin
+    SymptomCategory.APPETITE -> R.string.symptom_category_appetite
+    SymptomCategory.DISCHARGE -> R.string.symptom_category_discharge
+    SymptomCategory.SLEEP -> R.string.symptom_category_sleep
+    SymptomCategory.BODY -> R.string.symptom_category_body
+}
+
+@StringRes
+fun Symptom.labelRes(): Int = when (this) {
+    Symptom.CRAMPS -> R.string.symptom_cramps
+    Symptom.HEADACHE -> R.string.symptom_headache
+    Symptom.MIGRAINE -> R.string.symptom_migraine
+    Symptom.BACK_PAIN -> R.string.symptom_back_pain
+    Symptom.TENDER_BREASTS -> R.string.symptom_tender_breasts
+    Symptom.LOW_LIBIDO -> R.string.symptom_low_libido
+    Symptom.HIGH_LIBIDO -> R.string.symptom_high_libido
+    Symptom.SEX -> R.string.symptom_sex
+    Symptom.OILY_SKIN -> R.string.symptom_oily_skin
+    Symptom.PIMPLES -> R.string.symptom_pimples
+    Symptom.MOUTH_ULCERS -> R.string.symptom_mouth_ulcers
+    Symptom.DRY_SKIN -> R.string.symptom_dry_skin
+    Symptom.CRAVINGS -> R.string.symptom_cravings
+    Symptom.LOSS_OF_APPETITE -> R.string.symptom_loss_of_appetite
+    Symptom.NAUSEA -> R.string.symptom_nausea
+    Symptom.VOMITING -> R.string.symptom_vomiting
+    Symptom.BLOATING -> R.string.symptom_bloating
+    Symptom.CONSTIPATION -> R.string.symptom_constipation
+    Symptom.DIARRHEA -> R.string.symptom_diarrhea
+    Symptom.SPOTTING -> R.string.symptom_spotting
+    Symptom.DISCHARGE_DRY -> R.string.symptom_discharge_dry
+    Symptom.DISCHARGE_CREAMY -> R.string.symptom_discharge_creamy
+    Symptom.DISCHARGE_EGG_WHITE -> R.string.symptom_discharge_egg_white
+    Symptom.DISCHARGE_UNUSUAL -> R.string.symptom_discharge_unusual
+    Symptom.INSOMNIA -> R.string.symptom_insomnia
+    Symptom.RESTLESS_SLEEP -> R.string.symptom_restless_sleep
+    Symptom.DROWSINESS -> R.string.symptom_drowsiness
+    Symptom.WATER_RETENTION -> R.string.symptom_water_retention
+    Symptom.HOT_FLASHES -> R.string.symptom_hot_flashes
+    Symptom.DIZZINESS -> R.string.symptom_dizziness
 }
 
 @StringRes

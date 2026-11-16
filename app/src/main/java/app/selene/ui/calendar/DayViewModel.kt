@@ -53,15 +53,14 @@ class DayViewModel(
     private val _deletions = Channel<UndoableDeletion>(Channel.BUFFERED)
     val deletions: Flow<UndoableDeletion> = _deletions.receiveAsFlow()
 
-    fun deletePeriod(alsoDeleteMood: Boolean) = viewModelScope.launch {
-        val deleted = repository.deletePeriodDay(date, alsoDeleteMood)
+    fun deletePeriod() = viewModelScope.launch {
+        val deleted = repository.deletePeriod(date)
         _deletions.send(UndoableDeletion(R.string.day_deleted_period, deleted))
     }
 
-    fun deleteMood() = viewModelScope.launch {
-        runCatching { repository.deleteMood(date) }.onSuccess {
-            _deletions.send(UndoableDeletion(R.string.day_deleted_mood, it))
-        }
+    fun deleteSymptoms() = viewModelScope.launch {
+        val deleted = repository.deleteSymptoms(date)
+        _deletions.send(UndoableDeletion(R.string.day_deleted_symptoms, deleted))
     }
 
     fun deleteEvent(id: String) = viewModelScope.launch {

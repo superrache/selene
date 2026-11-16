@@ -12,13 +12,20 @@ data class PeriodLogEntity(
     @PrimaryKey val date: LocalDate,
     val flow: Int,
     val pain: Int,
-    val fatigue: Int,
 )
 
-@Entity(tableName = "mood_log")
-data class MoodLogEntity(
+/**
+ * Symptoms of the day. [moods] and [symptoms] are comma-separated stable codes
+ * (see [app.selene.domain.model.Mood.code], [app.selene.domain.model.Symptom.code]), empty when none.
+ */
+@Entity(tableName = "symptom_log")
+data class SymptomLogEntity(
     @PrimaryKey val date: LocalDate,
-    val mood: Int,
+    val moods: String,
+    val symptoms: String,
+    val irritability: Int?,
+    val fatigue: Int?,
+    val note: String?,
 )
 
 @Entity(tableName = "notable_event", indices = [Index("date")])

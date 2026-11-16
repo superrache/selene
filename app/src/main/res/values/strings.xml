@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fr">
     <string name="app_name">Sélène</string>
 
     <!-- Navigation -->
@@ -67,13 +67,63 @@
     <string name="level_3">Forte</string>
     <string name="level_4">Très forte</string>
     <string name="level_value" tools:ignore="PluralsCandidate">%1$d sur 4, %2$s</string>
+    <string name="level_not_noted">Non noté</string>
+    <string name="level_clear_hint">Touchez de nouveau le niveau choisi pour l’effacer.</string>
+
+    <!-- Symptoms of the day -->
+    <string name="symptoms_title">Symptômes du jour</string>
+    <string name="symptoms_hint">Plusieurs choix possibles. Ne notez que ce qui vous parle.</string>
     <string name="mood_label">Humeur</string>
-    <string name="mood_required">Humeur (obligatoire)</string>
-    <string name="mood_1">Très mal</string>
-    <string name="mood_2">Mal</string>
-    <string name="mood_3">Neutre</string>
-    <string name="mood_4">Bien</string>
-    <string name="mood_5">Très bien</string>
+    <string name="mood_joyful">Joyeuse</string>
+    <string name="mood_good">Bien</string>
+    <string name="mood_neutral">Neutre</string>
+    <string name="mood_annoyed">Agacée</string>
+    <string name="mood_sad">Triste</string>
+    <string name="mood_drained">À bout</string>
+    <string name="mood_fragile">Fragile</string>
+    <string name="mood_crying">En larmes</string>
+    <string name="mood_anxious">Anxieuse</string>
+    <string name="irritability_label">Irritabilité</string>
+    <string name="symptom_category_pain">Douleurs</string>
+    <string name="symptom_category_sex">Sexe</string>
+    <string name="symptom_category_skin">Peau</string>
+    <string name="symptom_category_appetite">Appétit et digestion</string>
+    <string name="symptom_category_discharge">Pertes et saignements</string>
+    <string name="symptom_category_sleep">Sommeil</string>
+    <string name="symptom_category_body">Corps</string>
+    <string name="symptom_category_other">Autre</string>
+    <string name="symptom_cramps">Crampes</string>
+    <string name="symptom_headache">Maux de tête</string>
+    <string name="symptom_migraine">Migraine</string>
+    <string name="symptom_back_pain">Mal de dos</string>
+    <string name="symptom_tender_breasts">Seins sensibles</string>
+    <string name="symptom_low_libido">Perte de libido</string>
+    <string name="symptom_high_libido">Libido élevée</string>
+    <string name="symptom_sex">Rapport sexuel</string>
+    <string name="symptom_oily_skin">Peau grasse</string>
+    <string name="symptom_pimples">Boutons</string>
+    <string name="symptom_mouth_ulcers">Aphtes</string>
+    <string name="symptom_dry_skin">Peau sèche</string>
+    <string name="symptom_cravings">Fringale</string>
+    <string name="symptom_loss_of_appetite">Perte d’appétit</string>
+    <string name="symptom_nausea">Nausées</string>
+    <string name="symptom_vomiting">Vomissements</string>
+    <string name="symptom_bloating">Ballonnements</string>
+    <string name="symptom_constipation">Constipation</string>
+    <string name="symptom_diarrhea">Diarrhée</string>
+    <string name="symptom_spotting">Spotting (sang hors règles)</string>
+    <string name="symptom_discharge_dry">Pertes sèches</string>
+    <string name="symptom_discharge_creamy">Pertes crémeuses</string>
+    <string name="symptom_discharge_egg_white">Pertes blanc d’œuf</string>
+    <string name="symptom_discharge_unusual">Pertes inhabituelles</string>
+    <string name="symptom_insomnia">Insomnie</string>
+    <string name="symptom_restless_sleep">Sommeil agité</string>
+    <string name="symptom_drowsiness">Somnolence</string>
+    <string name="symptom_water_retention">Rétention d’eau</string>
+    <string name="symptom_hot_flashes">Bouffées de chaleur</string>
+    <string name="symptom_dizziness">Vertiges</string>
+    <string name="symptom_note_hint">Précisez (facultatif)</string>
+    <string name="symptom_note_counter">%1$d / %2$d</string>
 
     <!-- Entry -->
     <string name="entry_title_add">Ajouter</string>
@@ -82,12 +132,12 @@
     <string name="entry_choose_date">Choisir la date</string>
     <string name="entry_type">Type</string>
     <string name="entry_type_period">Règles</string>
-    <string name="entry_type_mood">Humeur</string>
+    <string name="entry_type_symptoms">Symptômes</string>
     <string name="entry_type_event">Événement</string>
     <string name="entry_event_title">Titre de l’événement</string>
     <string name="entry_event_hint">Ex. : nuit blanche, voyage, sport intense…</string>
     <string name="entry_event_counter">%1$d / %2$d</string>
-    <string name="entry_need_mood">Choisissez une humeur pour enregistrer le jour de règles.</string>
+    <string name="entry_symptoms_empty">Rien de coché : enregistrer effacera les symptômes de ce jour.</string>
     <string name="entry_need_title">Donnez un titre à l’événement.</string>
     <string name="entry_replaces_existing">Une saisie existe déjà ce jour-là : elle sera remplacée.</string>
     <string name="entry_error">L’enregistrement a échoué.</string>
@@ -96,17 +146,14 @@
     <string name="day_nothing">Rien de noté ce jour-là.</string>
     <string name="day_add">Ajouter à ce jour</string>
     <string name="day_period_title">Règles · flux %1$s</string>
-    <string name="day_period_detail">Douleur %1$d/4 · Fatigue %2$d/4</string>
-    <string name="day_mood_title">Humeur : %1$s</string>
-    <string name="day_mood_locked">Liée au jour de règles : supprimez les règles pour la retirer.</string>
+    <string name="day_period_detail">Douleur %1$d/4</string>
+    <string name="day_symptoms_level" tools:ignore="PluralsCandidate">%1$s %2$d/4</string>
     <string name="day_predicted_period">Règles prévues</string>
     <string name="day_fertile">Fenêtre fertile estimée</string>
     <string name="day_ovulation">Ovulation estimée</string>
     <string name="day_future_info">Vous pourrez noter ce jour quand il sera arrivé.</string>
-    <string name="day_delete_period_title">Supprimer ce jour de règles ?</string>
-    <string name="day_delete_period_also_mood">Supprimer aussi l’humeur de ce jour</string>
     <string name="day_deleted_period">Jour de règles supprimé</string>
-    <string name="day_deleted_mood">Humeur supprimée</string>
+    <string name="day_deleted_symptoms">Symptômes supprimés</string>
     <string name="day_deleted_event">Événement supprimé</string>
 
     <!-- Cycle -->
@@ -142,7 +189,7 @@
     <string name="cal_desc_fertile">fenêtre fertile</string>
     <string name="cal_desc_ovulation">ovulation estimée</string>
     <string name="cal_desc_event">événement remarquable</string>
-    <string name="cal_desc_mood">humeur notée</string>
+    <string name="cal_desc_symptoms">symptômes notés</string>
     <string name="cal_legend_predicted">Prévues</string>
     <string name="cal_legend_ovulation">Ovulation</string>
     <string name="cal_legend_event">Événement</string>
@@ -178,7 +225,31 @@
     <string name="analysis_mood_used">Le signal est utilisé. Il repose sur %3$s (cycles analysés : %4$d), avec une humeur basse environ %5$s j avant les règles. L’humeur basse notée le %1$s a affiné la prévision (estimation statistique seule : %2$s).</string>
     <string name="analysis_mood_reliable">Le signal est fiable : une humeur basse apparaît environ %1$s j avant les règles, dans %2$s (cycles analysés : %3$d). Il sera utilisé dès qu’une humeur basse sera notée en fin de cycle.</string>
     <string name="analysis_mood_unreliable">Le signal n’est pas utilisé : une humeur basse apparaît dans les 7 jours avant les règles dans %1$s (cycles analysés : %2$d). Il faut au moins 3 cycles, au moins la moitié des cycles analysés et des écarts réguliers.</string>
-    <string name="analysis_mood_none">Pas encore de signal : notez votre humeur, surtout en fin de cycle. Si une humeur basse revient régulièrement avant les règles, elle servira à affiner la prévision.</string>
+    <string name="analysis_mood_low_definition">Humeur basse : triste, à bout, fragile, en larmes ou anxieuse, ou irritabilité modérée ou plus.</string>
+    <string name="analysis_mood_none">Pas encore de signal : notez votre humeur ou votre irritabilité dans les symptômes du jour, surtout en fin de cycle. Si une humeur basse revient régulièrement avant les règles, elle servira à affiner la prévision.</string>
+    <string name="method_title">Comment c’est calculé ?</string>
+    <string name="method_expanded">déplié</string>
+    <string name="method_collapsed">replié</string>
+    <string name="method_average_title">Cycle moyen</string>
+    <string name="method_average_body">Votre cycle moyen est calculé sur vos 12 derniers cycles au plus. Les cycles récents comptent davantage : le plus ancien pèse 1, le suivant 2, et ainsi de suite jusqu’au plus récent. La moyenne suit ainsi votre rythme actuel plutôt que celui d’il y a un an.</string>
+    <string name="method_average_formula">(%1$s) ÷ %2$d = %3$s jours</string>
+    <string name="method_average_formula_long">Somme des durées × poids ÷ somme des poids = %1$s jours</string>
+    <string name="method_average_term">%1$d×%2$d</string>
+    <string name="method_average_simple">Sans pondération, la moyenne serait de %1$s jours.</string>
+    <string name="method_average_defaults">Il faut au moins deux cycles complets pour calculer votre moyenne. En attendant, Sélène utilise un cycle de 28 jours.</string>
+    <string name="method_chart_weighted">pondérée %1$s j</string>
+    <string name="method_chart_simple">simple %1$s j</string>
+    <string name="method_chart_weight">×%1$d</string>
+    <string name="method_chart_item">%1$s, poids %2$d</string>
+    <string name="method_chart_description">Cycles retenus, du plus ancien au plus récent : %1$s. Moyenne pondérée %2$s jours, moyenne simple %3$s jours.</string>
+    <string name="method_cycles_title">Découpage en cycles</string>
+    <string name="method_cycles_body">Un cycle commence le premier jour des règles et se termine la veille des règles suivantes. Les jours de règles qui se suivent forment un seul épisode, même s’il manque un jour au milieu : un oubli de saisie ne coupe pas vos règles en deux.</string>
+    <string name="method_excluded_title">Cycles écartés</string>
+    <string name="method_excluded_body">Un cycle de moins de 15 jours ou de plus de 60 jours vient très probablement d’un oubli de saisie. Il reste visible dans le graphique (barre hachurée), mais n’entre pas dans les calculs.</string>
+    <string name="method_pms_title">Signal d’humeur (SPM)</string>
+    <string name="method_pms_body">Si une humeur basse revient régulièrement quelques jours avant vos règles (sur au moins 3 cycles), Sélène s’en sert comme indice : quand vous notez une humeur basse en fin de cycle, la date des prochaines règles se rapproche de celle que suggère votre humeur, et la marge d’incertitude se resserre.</string>
+    <string name="method_privacy_title">Vos données restent sur votre téléphone</string>
+    <string name="method_privacy_body">Tous ces calculs sont faits sur votre téléphone, à chaque modification. Les prévisions ne sont jamais enregistrées ni envoyées nulle part.</string>
     <string name="analysis_disclaimer">Sélène n’est ni un avis médical ni une méthode de contraception. Les dates affichées sont des estimations, avec leur marge d’incertitude.</string>
 
     <!-- Settings -->
@@ -223,7 +294,7 @@
     <string name="settings_biometric_summary">Demander l’empreinte, le visage ou le code de l’appareil à l’ouverture.</string>
     <string name="settings_biometric_unavailable">Aucune méthode de déverrouillage configurée sur cet appareil.</string>
     <string name="settings_erase">Effacer toutes les données</string>
-    <string name="settings_erase_summary">Règles, humeurs, événements et réglages.</string>
+    <string name="settings_erase_summary">Règles, symptômes, événements et réglages.</string>
     <string name="settings_erase_confirm1_title">Effacer toutes les données ?</string>
     <string name="settings_erase_confirm1">Toutes vos saisies seront supprimées de ce téléphone. Pensez à exporter vos données avant.</string>
     <string name="settings_erase_confirm2_title">Dernière confirmation</string>
@@ -245,13 +316,15 @@
     <string name="import_error_date">Jour n° %1$d : date « %2$s » invalide (format attendu AAAA-MM-JJ).</string>
     <string name="import_error_duplicate_date">Le jour %1$s apparaît plusieurs fois.</string>
     <string name="import_error_range">%1$s : %2$s vaut %3$d, valeur attendue entre %4$d et %5$d.</string>
-    <string name="import_error_period_without_mood">%1$s : un jour de règles doit avoir une humeur.</string>
+    <string name="import_error_unknown_mood">%1$s : humeur « %2$s » inconnue.</string>
+    <string name="import_error_unknown_symptom">%1$s : symptôme « %2$s » inconnu.</string>
+    <string name="import_error_note" tools:ignore="PluralsCandidate">%1$s : la précision « Autre » dépasse %2$d caractères.</string>
     <string name="import_error_event_title">%1$s : titre d’événement vide ou de plus de 80 caractères.</string>
     <string name="import_error_event_id">%1$s : identifiant d’événement absent ou en double (« %2$s »).</string>
     <string name="import_field_flow">le flux</string>
     <string name="import_field_pain">la douleur</string>
     <string name="import_field_fatigue">la fatigue</string>
-    <string name="import_field_mood">l’humeur</string>
+    <string name="import_field_irritability">l’irritabilité</string>
 
     <!-- Lock -->
     <string name="lock_title">Sélène est verrouillée</string>

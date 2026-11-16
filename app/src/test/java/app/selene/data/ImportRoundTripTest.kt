@@ -6,6 +6,8 @@ import app.selene.data.json.JsonExport
 import app.selene.data.json.JsonImport
 import app.selene.domain.model.Mood
 import app.selene.domain.model.PeriodLog
+import app.selene.domain.model.Symptom
+import app.selene.domain.model.SymptomLog
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,8 +26,17 @@ class ImportRoundTripTest {
         repeat(60) { i ->
             val d = start.plusDays(i.toLong())
             when {
-                i % 28 < 5 -> repo.savePeriodDay(PeriodLog(d, 1 + i % 4, i % 5, (i + 2) % 5), Mood.entries[i % 5])
-                i % 3 == 0 -> repo.saveMood(d, Mood.entries[(i + 1) % 5])
+                i % 28 < 5 -> repo.savePeriod(PeriodLog(d, 1 + i % 4, i % 5))
+                i % 3 == 0 -> repo.saveSymptoms(
+                    SymptomLog(
+                        date = d,
+                        moods = setOf(Mood.entries[i % Mood.entries.size], Mood.entries[(i + 4) % Mood.entries.size]),
+                        symptoms = Symptom.entries.filterIndexed { k, _ -> (k + i) % 7 == 0 }.toSet(),
+                        irritability = (i % 6).takeIf { it <= 4 },
+                        fatigue = i % 5,
+                        note = if (i % 2 == 0) "Note « $i » avec accents é, ü et \"guillemets\"" else null,
+                    ),
+                )
             }
             if (i % 7 == 0) repo.addEvent(d, "Événement $i")
         }
@@ -33,7 +44,7 @@ class ImportRoundTripTest {
 
         val target = inMemoryDatabase()
         val targetRepo = LogRepository(target)
-        targetRepo.saveMood(LocalDate.of(2020, 1, 1), Mood.GOOD)
+        targetRepo.saveSymptoms(SymptomLog(LocalDate.of(2020, 1, 1), moods = setOf(Mood.GOOD)))
         targetRepo.import(assertIs<ImportResult.Success>(JsonImport.parse(text)).days, LogRepository.ImportMode.REPLACE_ALL)
 
         assertEquals(repo.snapshot(), targetRepo.snapshot())
@@ -45,11 +56,11 @@ class ImportRoundTripTest {
     fun anInvalidFileChangesNothing() = runTest {
         val db = inMemoryDatabase()
         val repo = LogRepository(db)
-        repo.saveMood(LocalDate.of(2026, 11, 1), Mood.GOOD)
+        repo.saveSymptoms(SymptomLog(LocalDate.of(2026, 11, 1), moods = setOf(Mood.GOOD)))
         val before = repo.snapshot()
-        val text = """{"format":"selene-export","version":1,"exportedAt":"x","days":[
-            {"date":"2026-11-02","mood":3},
-            {"date":"2026-11-03","period":{"flow":2,"pain":0,"fatigue":0}}]}"""
+        val text = """{"format":"selene-export","version":2,"exportedAt":"x","days":[
+            {"date":"2026-11-02","symptoms":{"moods":["sad"]}},
+            {"date":"2026-11-03","symptoms":{"items":["cramps","telepathy"]}}]}"""
         val result = JsonImport.parse(text)
         assertIs<ImportResult.Failure>(result)
         // Callers only write on Success; nothing was written.

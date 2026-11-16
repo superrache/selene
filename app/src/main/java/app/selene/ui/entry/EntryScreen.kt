@@ -56,17 +56,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.selene.R
 import app.selene.domain.model.Mood
 import app.selene.domain.model.NotableEvent
+import app.selene.domain.model.Symptom
+import app.selene.domain.model.SymptomCategory
+import app.selene.domain.model.SymptomLog
 import app.selene.ui.DateFormats
 import app.selene.ui.components.BorderChoice
 import app.selene.ui.components.FlowPicker
 import app.selene.ui.components.LevelPicker
 import app.selene.ui.components.MoodFace
 import app.selene.ui.components.MoodPicker
+import app.selene.ui.components.OptionalLevelPicker
 import app.selene.ui.components.PrimaryButton
 import app.selene.ui.components.ScreenHeader
 import app.selene.ui.components.SectionTitle
 import app.selene.ui.components.SeleneCard
 import app.selene.ui.components.SeleneIcons
+import app.selene.ui.components.SymptomChips
+import app.selene.ui.labelRes
 import app.selene.ui.theme.SeleneColors
 import app.selene.ui.theme.SeleneDimens
 import java.time.Instant
@@ -85,8 +91,13 @@ fun EntryScreen(viewModel: EntryViewModel, onClose: () -> Unit) {
         onKind = viewModel::setKind,
         onFlow = viewModel::setFlow,
         onPain = viewModel::setPain,
-        onFatigue = viewModel::setFatigue,
-        onMood = viewModel::setMood,
+        symptomActions = SymptomActions(
+            onMood = viewModel::toggleMood,
+            onSymptom = viewModel::toggleSymptom,
+            onIrritability = viewModel::setIrritability,
+            onFatigue = viewModel::setFatigue,
+            onNote = viewModel::setNote,
+        ),
         onTitle = viewModel::setTitle,
         onSave = viewModel::save,
     )
@@ -100,8 +111,7 @@ fun EntryContent(
     onKind: (EntryKind) -> Unit,
     onFlow: (Int) -> Unit,
     onPain: (Int) -> Unit,
-    onFatigue: (Int) -> Unit,
-    onMood: (Mood) -> Unit,
+    symptomActions: SymptomActions,
     onTitle: (String) -> Unit,
     onSave: () -> Unit,
 ) {
@@ -127,12 +137,8 @@ fun EntryContent(
             DateRow(state, onClick = { showDatePicker = true })
             if (!state.isEdit) KindSelector(state.kind, onKind)
             when (state.kind) {
-                EntryKind.PERIOD -> PeriodFields(state, onFlow, onPain, onFatigue, onMood)
-                EntryKind.MOOD -> Column {
-                    SectionTitle(stringResource(R.string.mood_label))
-                    Spacer(Modifier.height(8.dp))
-                    MoodPicker(state.mood, onMood)
-                }
+                EntryKind.PERIOD -> PeriodFields(state, onFlow, onPain)
+                EntryKind.SYMPTOMS -> SymptomFields(state, symptomActions)
                 EntryKind.EVENT -> EventFields(state.title, onTitle)
             }
             Spacer(Modifier.height(8.dp))
@@ -144,7 +150,8 @@ fun EntryContent(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val hint = when {
-                state.kind == EntryKind.PERIOD && state.mood == null -> stringResource(R.string.entry_need_mood)
+                state.kind == EntryKind.SYMPTOMS && state.symptomLog.isEmpty && state.existingSymptoms ->
+                    stringResource(R.string.entry_symptoms_empty)
                 state.kind == EntryKind.EVENT && !state.titleValid -> stringResource(R.string.entry_need_title)
                 state.error -> stringResource(R.string.entry_error)
                 state.replacesExisting -> stringResource(R.string.entry_replaces_existing)
@@ -202,7 +209,7 @@ private fun KindSelector(kind: EntryKind, onKind: (EntryKind) -> Unit) {
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             KindChoice(EntryKind.PERIOD, kind, stringResource(R.string.entry_type_period), SeleneIcons.Drop, onKind, Modifier.weight(1f))
-            KindChoice(EntryKind.MOOD, kind, stringResource(R.string.entry_type_mood), null, onKind, Modifier.weight(1f))
+            KindChoice(EntryKind.SYMPTOMS, kind, stringResource(R.string.entry_type_symptoms), null, onKind, Modifier.weight(1f))
             KindChoice(EntryKind.EVENT, kind, stringResource(R.string.entry_type_event), SeleneIcons.Bolt, onKind, Modifier.weight(1f))
         }
     }
@@ -229,7 +236,7 @@ private fun KindChoice(
         val tint = when (value) {
             EntryKind.PERIOD -> SeleneColors.Period
             EntryKind.EVENT -> SeleneColors.Event
-            EntryKind.MOOD -> SeleneColors.TextPrimary
+            EntryKind.SYMPTOMS -> SeleneColors.TextPrimary
         }
         if (icon != null) Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
         else MoodFace(Mood.GOOD, color = tint, size = 24.dp)
@@ -243,8 +250,6 @@ private fun PeriodFields(
     state: EntryUiState,
     onFlow: (Int) -> Unit,
     onPain: (Int) -> Unit,
-    onFatigue: (Int) -> Unit,
-    onMood: (Mood) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Column {
@@ -253,11 +258,77 @@ private fun PeriodFields(
             FlowPicker(state.flow, onFlow)
         }
         LevelPicker(stringResource(R.string.pain_label), state.pain, onPain)
-        LevelPicker(stringResource(R.string.fatigue_label), state.fatigue, onFatigue)
-        Column {
-            SectionTitle(stringResource(R.string.mood_required))
+    }
+}
+
+/** Callbacks of the "symptoms of the day" sheet. */
+class SymptomActions(
+    val onMood: (Mood) -> Unit,
+    val onSymptom: (Symptom) -> Unit,
+    val onIrritability: (Int?) -> Unit,
+    val onFatigue: (Int?) -> Unit,
+    val onNote: (String) -> Unit,
+)
+
+@Composable
+private fun SymptomFields(state: EntryUiState, actions: SymptomActions) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.symptoms_hint), style = MaterialTheme.typography.bodyMedium, color = SeleneColors.TextSecondary)
+        SeleneCard(Modifier.fillMaxWidth()) {
+            SectionTitle(stringResource(R.string.mood_label))
+            Spacer(Modifier.height(10.dp))
+            MoodPicker(state.moods, actions.onMood)
+        }
+        SeleneCard(Modifier.fillMaxWidth()) {
+            OptionalLevelPicker(
+                title = stringResource(R.string.irritability_label),
+                selected = state.irritability,
+                onSelect = actions.onIrritability,
+                icon = SeleneIcons.Irritability,
+                iconTint = SeleneColors.Period,
+            )
+            Spacer(Modifier.height(16.dp))
+            OptionalLevelPicker(
+                title = stringResource(R.string.fatigue_label),
+                selected = state.fatigue,
+                onSelect = actions.onFatigue,
+                icon = SeleneIcons.Battery,
+                iconTint = SeleneColors.Fertile,
+            )
             Spacer(Modifier.height(8.dp))
-            MoodPicker(state.mood, onMood)
+            Text(stringResource(R.string.level_clear_hint), style = MaterialTheme.typography.bodySmall, color = SeleneColors.TextSecondary)
+        }
+        SymptomCategory.entries.forEach { category ->
+            SeleneCard(Modifier.fillMaxWidth()) {
+                SectionTitle(stringResource(category.labelRes()))
+                Spacer(Modifier.height(10.dp))
+                SymptomChips(Symptom.entries.filter { it.category == category }, state.symptoms, actions.onSymptom)
+            }
+        }
+        SeleneCard(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(SeleneIcons.Edit, contentDescription = null, tint = SeleneColors.TextSecondary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                SectionTitle(stringResource(R.string.symptom_category_other))
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = state.note,
+                onValueChange = actions.onNote,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text(stringResource(R.string.symptom_note_hint)) },
+                minLines = 2,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                supportingText = {
+                    Text(stringResource(R.string.symptom_note_counter, state.note.length, SymptomLog.NOTE_MAX_LENGTH))
+                },
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = SeleneColors.Period,
+                    unfocusedBorderColor = SeleneColors.Border,
+                    cursorColor = SeleneColors.Period,
+                ),
+            )
         }
     }
 }

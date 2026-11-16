@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -21,27 +18,22 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.selene.R
 import app.selene.domain.model.Mood
 import app.selene.domain.model.NotableEvent
 import app.selene.domain.model.PeriodLog
+import app.selene.domain.model.Symptom
+import app.selene.domain.model.SymptomLog
 import app.selene.ui.DateFormats
 import app.selene.ui.components.EditDeleteRow
 import app.selene.ui.components.IconBadge
@@ -50,6 +42,11 @@ import app.selene.ui.components.PrimaryButton
 import app.selene.ui.components.ScreenHeader
 import app.selene.ui.components.SeleneCard
 import app.selene.ui.components.SeleneIcons
+import app.selene.ui.components.SymptomGlyph
+import app.selene.ui.theme.SeleneShapes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import app.selene.ui.entry.EntryKind
 import app.selene.ui.flowLabelRes
 import app.selene.ui.labelRes
@@ -65,7 +62,6 @@ fun DayScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
-    val context = LocalContext.current
     val resources = LocalResources.current
     val undoLabel = stringResource(R.string.action_undo)
     LaunchedEffect(viewModel) {
@@ -79,7 +75,6 @@ fun DayScreen(
             if (result == SnackbarResult.ActionPerformed) viewModel.undo(deletion)
         }
     }
-    var confirmPeriodDelete by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         containerColor = SeleneColors.Background,
@@ -103,14 +98,9 @@ fun DayScreen(
         ) {
             PredictionBadges(state)
             val day = state.day
-            day.period?.let { PeriodItem(it, onEdit = { onEdit(EntryKind.PERIOD, null) }, onDelete = { confirmPeriodDelete = true }) }
-            day.mood?.let { mood ->
-                MoodItem(
-                    mood = mood,
-                    locked = day.period != null,
-                    onEdit = { onEdit(EntryKind.MOOD, null) },
-                    onDelete = { viewModel.deleteMood() },
-                )
+            day.period?.let { PeriodItem(it, onEdit = { onEdit(EntryKind.PERIOD, null) }, onDelete = { viewModel.deletePeriod() }) }
+            day.symptoms?.let { symptoms ->
+                SymptomsItem(symptoms, onEdit = { onEdit(EntryKind.SYMPTOMS, null) }, onDelete = { viewModel.deleteSymptoms() })
             }
             day.events.forEach { event ->
                 EventItem(event, onEdit = { onEdit(EntryKind.EVENT, event.id) }, onDelete = { viewModel.deleteEvent(event.id) })
@@ -126,16 +116,6 @@ fun DayScreen(
             Spacer(Modifier.height(8.dp))
             if (!state.isFuture) PrimaryButton(stringResource(R.string.day_add), onClick = onAdd)
         }
-    }
-
-    if (confirmPeriodDelete) {
-        DeletePeriodDialog(
-            onDismiss = { confirmPeriodDelete = false },
-            onConfirm = { alsoMood ->
-                confirmPeriodDelete = false
-                viewModel.deletePeriod(alsoMood)
-            },
-        )
     }
 }
 
@@ -167,7 +147,60 @@ private fun PeriodItem(period: PeriodLog, onEdit: () -> Unit, onDelete: () -> Un
     ItemCard(
         badge = { IconBadge(SeleneIcons.Drop, SeleneColors.Period) },
         title = title,
-        subtitle = stringResource(R.string.day_period_detail, period.pain, period.fatigue),
+        subtitle = stringResource(R.string.day_period_detail, period.pain),
+        actions = {
+            EditDeleteRow(
+                editLabel = stringResource(R.string.action_edit),
+                deleteLabel = stringResource(R.string.action_delete),
+                onEdit = onEdit,
+                onDelete = onDelete,
+                editDescription = stringResource(R.string.action_edit) + " : " + title,
+                deleteDescription = stringResource(R.string.action_delete) + " : " + title,
+            )
+        },
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SymptomsItem(symptoms: SymptomLog, onEdit: () -> Unit, onDelete: () -> Unit) {
+    val title = stringResource(R.string.symptoms_title)
+    val levels = listOfNotNull(
+        symptoms.irritability?.let { stringResource(R.string.day_symptoms_level, stringResource(R.string.irritability_label), it) },
+        symptoms.fatigue?.let { stringResource(R.string.day_symptoms_level, stringResource(R.string.fatigue_label), it) },
+    ).joinToString(" · ").ifEmpty { null }
+    ItemCard(
+        badge = {
+            val first = symptoms.moods.minOrNull()
+            if (first != null) MoodFace(first, color = SeleneColors.TextPrimary, size = 40.dp)
+            else IconBadge(SeleneIcons.Check, SeleneColors.Fertile)
+        },
+        title = title,
+        subtitle = levels,
+        body = {
+            FlowRow(
+                Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Mood.entries.filter { it in symptoms.moods }.forEach { mood ->
+                    Tag(text = stringResource(mood.labelRes())) {
+                        MoodFace(mood, color = SeleneColors.TextPrimary, size = 18.dp)
+                    }
+                }
+                Symptom.entries.filter { it in symptoms.symptoms }.forEach { symptom ->
+                    Tag(text = stringResource(symptom.labelRes())) { SymptomGlyph(symptom, size = 14) }
+                }
+            }
+            symptoms.note?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = SeleneColors.TextPrimary,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+        },
         actions = {
             EditDeleteRow(
                 editLabel = stringResource(R.string.action_edit),
@@ -182,23 +215,17 @@ private fun PeriodItem(period: PeriodLog, onEdit: () -> Unit, onDelete: () -> Un
 }
 
 @Composable
-private fun MoodItem(mood: Mood, locked: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
-    val title = stringResource(R.string.day_mood_title, stringResource(mood.labelRes()).lowercase())
-    ItemCard(
-        badge = { MoodFace(mood, color = SeleneColors.TextPrimary, size = 40.dp) },
-        title = title,
-        subtitle = if (locked) stringResource(R.string.day_mood_locked) else null,
-        actions = {
-            EditDeleteRow(
-                editLabel = stringResource(R.string.action_edit),
-                deleteLabel = stringResource(R.string.action_delete),
-                onEdit = onEdit,
-                onDelete = if (locked) null else onDelete,
-                editDescription = stringResource(R.string.action_edit) + " : " + title,
-                deleteDescription = stringResource(R.string.action_delete) + " : " + title,
-            )
-        },
-    )
+private fun Tag(text: String, icon: @Composable () -> Unit) {
+    Row(
+        Modifier
+            .background(SeleneColors.SurfaceHigh, SeleneShapes.Choice)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon()
+        Spacer(Modifier.width(6.dp))
+        Text(text, style = MaterialTheme.typography.labelLarge, color = SeleneColors.TextPrimary)
+    }
 }
 
 @Composable
@@ -225,6 +252,7 @@ private fun ItemCard(
     badge: @Composable () -> Unit,
     title: String,
     subtitle: String?,
+    body: @Composable () -> Unit = {},
     actions: @Composable () -> Unit,
 ) {
     SeleneCard(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 4.dp)) {
@@ -238,38 +266,7 @@ private fun ItemCard(
                 }
             }
         }
+        body()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { actions() }
     }
-}
-
-@Composable
-private fun DeletePeriodDialog(onDismiss: () -> Unit, onConfirm: (Boolean) -> Unit) {
-    var alsoMood by rememberSaveable { mutableStateOf(true) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = SeleneColors.Surface,
-        title = { Text(stringResource(R.string.day_delete_period_title)) },
-        text = {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .toggleable(value = alsoMood, role = Role.Checkbox, onValueChange = { alsoMood = it }),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(
-                    checked = alsoMood,
-                    onCheckedChange = null,
-                    colors = CheckboxDefaults.colors(checkedColor = SeleneColors.Period, checkmarkColor = SeleneColors.OnPeriod),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.day_delete_period_also_mood), style = MaterialTheme.typography.bodyLarge)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(alsoMood) }) {
-                Text(stringResource(R.string.action_delete), color = SeleneColors.Period)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
 }

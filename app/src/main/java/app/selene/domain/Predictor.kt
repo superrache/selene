@@ -8,7 +8,6 @@ import app.selene.domain.model.DateEstimate
 import app.selene.domain.model.DateRange
 import app.selene.domain.model.DayLog
 import app.selene.domain.model.FertileWindow
-import app.selene.domain.model.Mood
 import app.selene.domain.model.PmsSignal
 import app.selene.domain.model.Prediction
 import app.selene.domain.model.Reliability
@@ -28,7 +27,9 @@ import kotlin.math.sqrt
  * - the standard deviation uses the same weights;
  * - reliability: LOW < 2 valid cycles; VERY_GOOD ≥ 6 cycles and σ ≤ 2 d; GOOD ≥ 4 cycles and σ ≤ 4 d; MEDIUM otherwise;
  * - margin when defaults are used: ± 3 days;
- * - "probable PMS" arc: from the median mood offset when the signal is reliable, else the last 5 days of the cycle.
+ * - "probable PMS" arc: from the median mood offset when the signal is reliable, else the last 5 days of the cycle;
+ * - PMS signal: a moderate or stronger irritability (≥ 2) counts as a low-mood day, and a noted
+ *   irritability level (even 0) makes a cycle "analyzed", like a mood.
  */
 object Predictor {
     const val LUTEAL_DAYS = 14
@@ -53,9 +54,12 @@ object Predictor {
 
     fun predict(logs: List<DayLog>, today: LocalDate): Prediction {
         val periodDays = logs.filter { it.period != null }.map { it.date }
-        val moods: Map<LocalDate, Mood> = logs.mapNotNull { log -> log.mood?.let { log.date to it } }.toMap()
+        // Days whose mood side was noted, mapped to "is a low-mood day" (low mood or irritability ≥ 2).
+        val moods: Map<LocalDate, Boolean> = logs.mapNotNull { it.symptoms }
+            .filter { it.hasMoodEntry }
+            .associate { it.date to it.isPmsSignalDay }
         val cycles = CycleCalculator.cycles(periodDays)
-        val statCycles = cycles.filter { it.isValid }.takeLast(MAX_CYCLES_FOR_STATS)
+        val statCycles = statisticsCycles(cycles)
         val stats = statistics(statCycles)
         val reliability = reliability(stats)
         val pmsSignal = pmsSignal(statCycles, moods)
@@ -78,6 +82,12 @@ object Predictor {
 
     // --- Statistics -----------------------------------------------------------------------------
 
+    /** Cycles used by the statistics: the most recent valid ones, oldest first (at most [MAX_CYCLES_FOR_STATS]). */
+    fun statisticsCycles(cycles: List<Cycle>): List<Cycle> = cycles.filter { it.isValid }.takeLast(MAX_CYCLES_FOR_STATS)
+
+    /** Linear weights of [count] cycles, oldest first: 1, 2, …, count. */
+    fun cycleWeights(count: Int): List<Int> = (1..count).toList()
+
     internal fun statistics(validCycles: List<Cycle>): CycleStats {
         if (validCycles.size < MIN_CYCLES_FOR_STATS) {
             return CycleStats(
@@ -89,7 +99,7 @@ object Predictor {
             )
         }
         val lengths = validCycles.map { it.length!!.toDouble() }
-        val weights = lengths.indices.map { (it + 1).toDouble() }
+        val weights = cycleWeights(lengths.size).map { it.toDouble() }
         val totalWeight = weights.sum()
         val mean = lengths.zip(weights).sumOf { (l, w) -> l * w } / totalWeight
         val variance = lengths.zip(weights).sumOf { (l, w) -> w * (l - mean) * (l - mean) } / totalWeight
@@ -116,7 +126,7 @@ object Predictor {
 
     // --- PMS mood signal ------------------------------------------------------------------------
 
-    internal fun pmsSignal(pastCycles: List<Cycle>, moods: Map<LocalDate, Mood>): PmsSignal {
+    internal fun pmsSignal(pastCycles: List<Cycle>, moods: Map<LocalDate, Boolean>): PmsSignal {
         var analyzed = 0
         val offsets = mutableListOf<Int>()
         for (cycle in pastCycles) {
@@ -124,7 +134,7 @@ object Predictor {
             val window = (PMS_LOOKBACK_DAYS downTo 1).map { periodStart.minusDays(it.toLong()) }
             if (window.none { it in moods }) continue
             analyzed++
-            val firstLow = window.firstOrNull { moods[it]?.isLow == true } ?: continue
+            val firstLow = window.firstOrNull { moods[it] == true } ?: continue
             offsets += daysBetween(firstLow, periodStart)
         }
         if (offsets.isEmpty()) return PmsSignal(analyzed, 0, null, null, false)
@@ -147,7 +157,7 @@ object Predictor {
         cycle: Cycle,
         stats: CycleStats,
         signal: PmsSignal,
-        moods: Map<LocalDate, Mood>,
+        moods: Map<LocalDate, Boolean>,
         today: LocalDate,
     ): CurrentCycle {
         val start = cycle.start
@@ -160,7 +170,7 @@ object Predictor {
         if (signal.isReliable && statVariance != null) {
             val windowStart = maxOf(statDate.minusDays(PMS_CURRENT_CYCLE_WINDOW_DAYS.toLong()), cycle.episode.end.plusDays(1))
             moodDate = moods.keys
-                .filter { !it.isBefore(windowStart) && !it.isAfter(today) && moods[it]!!.isLow }
+                .filter { !it.isBefore(windowStart) && !it.isAfter(today) && moods[it] == true }
                 .minOrNull()
             if (moodDate != null) {
                 val moodEstimate = moodDate.toEpochDay() + signal.medianOffsetDays!!

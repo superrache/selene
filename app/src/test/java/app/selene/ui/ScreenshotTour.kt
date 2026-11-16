@@ -14,6 +14,12 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.selene.domain.model.Mood
 import app.selene.domain.model.PeriodLog
+import app.selene.domain.model.Symptom
+import app.selene.domain.model.SymptomLog
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import app.selene.ui.navigation.SeleneNavHost
 import app.selene.ui.theme.SeleneTheme
 import kotlinx.coroutines.runBlocking
@@ -47,16 +53,25 @@ class ScreenshotTour {
             for (l in lengths + 0) {
                 repeat(5) { i ->
                     val d = start.plusDays(i.toLong())
-                    if (!d.isAfter(today)) repo.savePeriodDay(PeriodLog(d, listOf(3, 3, 2, 1, 1)[i], 2 - i / 2, 1), Mood.entries[(i + 1) % 5])
+                    if (!d.isAfter(today)) repo.savePeriod(PeriodLog(d, listOf(3, 3, 2, 1, 1)[i], 2 - i / 2))
                 }
                 if (l > 0) {
-                    repo.saveMood(start.plusDays(l - 2L), Mood.BAD)
-                    repo.saveMood(start.plusDays(l - 6L), Mood.GOOD)
+                    repo.saveSymptoms(SymptomLog(start.plusDays(l - 2L), moods = setOf(Mood.SAD), symptoms = setOf(Symptom.CRAMPS)))
+                    repo.saveSymptoms(SymptomLog(start.plusDays(l - 6L), moods = setOf(Mood.GOOD)))
                 }
                 start = start.plusDays(l.toLong())
             }
             repo.addEvent(today.minusDays(3), "Nuit blanche")
-            repo.saveMood(today.minusDays(3), Mood.BAD)
+            repo.saveSymptoms(
+                SymptomLog(
+                    today.minusDays(3),
+                    moods = setOf(Mood.DRAINED, Mood.ANXIOUS),
+                    symptoms = setOf(Symptom.HEADACHE, Symptom.NAUSEA, Symptom.SPOTTING),
+                    irritability = 2,
+                    fatigue = 3,
+                    note = "Réveillée à 4 h",
+                ),
+            )
         }
         compose.setContent {
             CompositionLocalProvider(LocalAppContainer provides container) { SeleneTheme { SeleneNavHost() } }
@@ -69,9 +84,21 @@ class ScreenshotTour {
         shot("1-cycle")
         compose.onNodeWithText("Calendrier").performClick(); shot("2-calendar")
         compose.onNodeWithText("Analyse").performClick(); shot("3-analysis")
+        compose.onNodeWithText("Comment c’est calculé ?").performScrollTo(); shot("3b-analysis-method")
+        compose.onNodeWithText("Découpage en cycles").performClick()
+        compose.onNodeWithText("Vos données restent sur votre téléphone").performScrollTo(); shot("3c-analysis-method-end")
         compose.onNodeWithText("Réglages").performClick(); shot("4-settings")
         compose.onNodeWithContentDescription("Ajouter").performClick(); shot("5-entry")
-        compose.onNodeWithText("Événement").performClick(); shot("6-entry-event")
+        compose.onNodeWithText("Symptômes").performClick(); shot("6-entry-symptoms")
+        compose.onNodeWithText("Peau").performScrollTo(); shot("7-entry-symptoms-2")
+        compose.onNodeWithText("Autre").performScrollTo(); shot("8-entry-symptoms-3")
+        compose.onNodeWithText("Événement").performScrollTo().performClick(); shot("9-entry-event")
+        compose.onNodeWithContentDescription("Fermer").performClick()
+        compose.onNodeWithText("Calendrier").performClick()
+        compose.waitForIdle()
+        val day = hasContentDescription(DateFormats.dayMonth(today.minusDays(3)), substring = true)
+        compose.onNodeWithTag(app.selene.ui.calendar.CALENDAR_LIST_TAG).performScrollToNode(day)
+        compose.onNode(day).performClick(); shot("10-day-detail")
     }
 
     /** Launcher icon as the system draws it: circle mask, rounded-square mask, and themed (monochrome). */

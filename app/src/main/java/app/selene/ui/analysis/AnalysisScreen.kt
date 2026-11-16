@@ -80,6 +80,7 @@ fun AnalysisContent(prediction: Prediction?) {
                 if (chartCycles.isNotEmpty()) CycleChart(chartCycles, if (stats.usesDefaults) null else stats.averageCycleLength)
                 if (prediction.hasData) ForecastCard(prediction)
                 MoodSignalCard(prediction)
+                MethodCard(prediction)
             }
             DisclaimerCard()
             Spacer(Modifier.height(SeleneDimens.BottomBarClearance))
@@ -263,6 +264,8 @@ private fun MoodSignalCard(p: Prediction) {
         SectionTitle(stringResource(R.string.analysis_mood_signal))
         Spacer(Modifier.height(8.dp))
         Text(text, style = MaterialTheme.typography.bodyMedium, color = SeleneColors.TextPrimary)
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.analysis_mood_low_definition), style = MaterialTheme.typography.bodySmall, color = SeleneColors.TextSecondary)
     }
 }
 

@@ -4,7 +4,7 @@
 
 ## Le projet en une phrase
 
-Une application Android très simple, **100 % hors-ligne**, pour noter ses règles, son humeur et des événements remarquables, visualiser le cycle en cours, et obtenir des prévisions (prochaines règles, prochaine ovulation) calculées localement à partir de l'historique.
+Une application Android très simple, **100 % hors-ligne**, pour noter ses règles, ses symptômes du jour (dont l'humeur) et des événements remarquables, visualiser le cycle en cours, et obtenir des prévisions (prochaines règles, prochaine ovulation) calculées localement à partir de l'historique.
 
 L'interface et tous les textes sont en **français**. Le code (identifiants, commentaires, messages de commit) est en **anglais**.
 
@@ -14,7 +14,7 @@ Ces règles priment sur toute autre considération. Si une tâche semble les con
 
 1. **Aucun réseau.** Le manifeste ne déclare **pas** `android.permission.INTERNET`. Aucune dépendance qui l'ajoute par fusion de manifeste (Firebase, Crashlytics, analytics, publicité, bibliothèques de polices téléchargeables, etc.). Un test vérifie que le manifeste fusionné ne contient pas cette permission (voir « Tests »).
 2. **Aucun serveur, aucun compte, aucune télémétrie.** Pas de rapport de plantage distant.
-3. **Stockage chiffré.** Toutes les données utilisateur vivent dans une base SQLCipher. Rien de sensible dans des `SharedPreferences` ou fichiers en clair, ni dans les logs (`Log.*` ne reçoit jamais une date de règles, une humeur ou un titre d'événement).
+3. **Stockage chiffré.** Toutes les données utilisateur vivent dans une base SQLCipher. Rien de sensible dans des `SharedPreferences` ou fichiers en clair, ni dans les logs (`Log.*` ne reçoit jamais une date de règles, un symptôme, une humeur ou un titre d'événement).
 4. **Pas de sauvegarde implicite.** `android:allowBackup="false"` et règles `dataExtractionRules` qui excluent tout (cloud et transfert d'appareil). La seule sortie des données est l'export JSON déclenché par l'utilisatrice.
 5. **Permissions minimales.** Uniquement `READ_CALENDAR` et `WRITE_CALENDAR`, demandées à l'exécution, seulement quand l'utilisatrice active la synchronisation du calendrier. Exception : `USE_BIOMETRIC` et `USE_FINGERPRINT`, permissions « normales » (sans dialogue, sans accès aux données) ajoutées par `androidx.biometric` pour le verrouillage facultatif. La tâche `verify<Variant>ManifestPermissions` n'autorise que ces quatre permissions. Import/export via le Storage Access Framework (aucune permission de stockage).
 6. **Ce n'est pas un dispositif médical.** Les prévisions sont présentées comme des estimations, avec leur marge d'incertitude ; l'écran Analyse rappelle que ce n'est ni un avis médical ni une méthode de contraception.
@@ -37,7 +37,7 @@ Ces règles priment sur toute autre considération. Si une tâche semble les con
 ```
 app/src/main/java/app/selene/
   domain/            Kotlin pur, aucune importation android.*
-    model/           DayLog, PeriodLog, Mood, NotableEvent, Cycle, Prediction
+    model/           DayLog, PeriodLog, SymptomLog, Mood, Symptom, NotableEvent, Cycle, Prediction
     CycleCalculator  découpe l'historique en cycles
     Predictor        statistiques + prévisions
   data/
@@ -52,7 +52,7 @@ app/src/main/java/app/selene/
     entry/           feuille d'ajout / édition
     analysis/        écran Analyse
     settings/        écran Réglages
-    components/      MoodFace, LevelPicker, FlowPicker, BottomBar…
+    components/      MoodFace, SymptomChip, LevelPicker, FlowPicker, BottomBar…
 ```
 
 - Flux de données unidirectionnel : `Repository (Flow) → ViewModel (StateFlow<UiState>) → Composable`.
@@ -61,20 +61,31 @@ app/src/main/java/app/selene/
 
 ## Modèle de données
 
-Un enregistrement par jour au plus pour les règles et l'humeur ; plusieurs événements remarquables possibles par jour.
+Un enregistrement par jour au plus pour les règles et pour les symptômes ; plusieurs événements remarquables possibles par jour.
 
-| Table           | Colonnes                                                             | Remarques                                                                                                                           |
-| --------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `period_log`    | `date` (PK, ISO `yyyy-MM-dd`), `flow` 1–4, `pain` 0–4, `fatigue` 0–4 | flux : 1 léger, 2 moyen, 3 abondant, 4 très abondant                                                                                |
-| `mood_log`      | `date` (PK), `mood` 1–5                                              | 1 très mal … 5 très bien                                                                                                            |
-| `notable_event` | `id` (UUID, PK), `date`, `title` (1–80 caractères)                   | affiché avec l'icône éclair                                                                                                         |
-| `settings`      | clé / valeur                                                         | synchronisation calendrier activée, id du calendrier choisi, id de l'événement créé, titre de l'événement, verrouillage biométrique |
+| Table           | Colonnes                                                                                     | Remarques                                                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `period_log`    | `date` (PK, ISO `yyyy-MM-dd`), `flow` 1–4, `pain` 0–4                                        | flux : 1 léger, 2 moyen, 3 abondant, 4 très abondant                                                                                |
+| `symptom_log`   | `date` (PK), `moods`, `symptoms` (codes séparés par des virgules), `irritability` 0–4 ou NULL, `fatigue` 0–4 ou NULL, `note` (≤ 200 caractères) ou NULL | « Symptômes du jour » : plusieurs humeurs et symptômes par jour ; une ligne vide est supprimée                                      |
+| `notable_event` | `id` (UUID, PK), `date`, `title` (1–80 caractères)                                           | affiché avec l'icône éclair                                                                                                         |
+| `settings`      | clé / valeur                                                                                 | synchronisation calendrier activée, id du calendrier choisi, id de l'événement créé, titre de l'événement, verrouillage biométrique |
 
-**Invariant central : un jour de règles a toujours une humeur.**
+**Symptômes du jour** (codes stables, à ne jamais renommer : ils sont stockés et exportés ; voir `Mood` et `Symptom` dans `domain/model/DayLog.kt`) :
 
-- L'ajout d'un jour de règles écrit `period_log` et `mood_log` dans **une seule transaction** ; l'interface n'autorise pas l'enregistrement tant que l'humeur n'est pas choisie.
-- L'humeur d'un jour de règles peut être modifiée, mais pas supprimée seule. Supprimer le jour de règles demande s'il faut aussi supprimer l'humeur (par défaut : oui).
-- Le dépôt (`LogRepository`) fait respecter l'invariant, pas seulement l'interface. L'import aussi.
+- Humeur (plusieurs choix) : 😁 joyeuse `joyful`, 🙂 bien `good`, 😐 neutre `neutral`, 😒 agacée `annoyed`, 😔 triste `sad`, 😫 à bout `drained`, 🥺 fragile `fragile`, 😭 en larmes `crying`, 😰 anxieuse `anxious`. « Humeur basse » (signal SPM) : triste, à bout, fragile, en larmes, anxieuse, ou irritabilité ≥ 2 (modérée).
+- Niveaux 0–4 facultatifs : irritabilité, fatigue.
+- Douleurs : crampes, maux de tête, migraine, mal de dos, seins sensibles.
+- Sexe : perte de libido, libido élevée, rapport sexuel.
+- Peau : peau grasse, boutons, aphtes, peau sèche.
+- Appétit et digestion : fringale, perte d'appétit, nausées 🤢, vomissements 🤮, ballonnements, constipation, diarrhée.
+- Pertes et saignements : spotting (sang hors règles), pertes sèches, crémeuses, blanc d'œuf, inhabituelles.
+- Sommeil : insomnie, sommeil agité, somnolence.
+- Corps : rétention d'eau, bouffées de chaleur, vertiges.
+- Autre : champ texte libre.
+
+Un jour de règles n'exige plus d'humeur (l'ancien invariant humeur/règles est supprimé depuis la version 2 de la base et du format JSON). Règles et symptômes se suppriment indépendamment, avec annulation.
+
+Base Room version 2 : la migration 1 → 2 convertit l'ancienne humeur 1–5 (1 en larmes, 2 triste, 3 neutre, 4 bien, 5 joyeuse) et déplace la fatigue des règles vers les symptômes (si > 0).
 
 Tout événement est modifiable et supprimable après coup (depuis le détail d'un jour). Suppression avec annulation possible (snackbar « Annuler »).
 
@@ -83,23 +94,30 @@ Tout événement est modifiable et supprimable après coup (depuis le détail d'
 ```json
 {
   "format": "selene-export",
-  "version": 1,
+  "version": 2,
   "exportedAt": "2026-11-15T13:47:00+01:00",
   "days": [
     {
       "date": "2026-11-09",
-      "period": { "flow": 2, "pain": 2, "fatigue": 3 },
-      "mood": 2,
+      "period": { "flow": 2, "pain": 2 },
+      "symptoms": {
+        "moods": ["sad"],
+        "items": ["cramps", "nausea"],
+        "irritability": 2,
+        "fatigue": 3,
+        "note": "Mal au genou"
+      },
       "events": [{ "id": "6f1c…", "title": "Nuit blanche" }]
     }
   ]
 }
 ```
 
-- Un objet par jour ayant au moins une donnée ; `period`, `mood`, `events` sont facultatifs ; jours triés par date.
+- Un objet par jour ayant au moins une donnée ; `period`, `symptoms`, `events` (et chaque champ de `symptoms`) sont facultatifs ; jours triés par date.
+- Version 1 (lecture seule) : `mood` 1–5 et `period.fatigue` sont convertis comme dans la migration de base.
 - Les prévisions et les réglages ne sont pas exportés.
 - **Export** : `ACTION_CREATE_DOCUMENT`, nom proposé `selene-AAAA-MM-JJ.json`. Avant d'écrire, avertir que le fichier exporté n'est **pas chiffré**.
-- **Import** : `ACTION_OPEN_DOCUMENT`. Valider entièrement avant d'écrire quoi que ce soit (format, version, dates, bornes, invariant humeur/règles) ; en cas d'erreur, ne rien modifier et afficher un message précis. Proposer « Fusionner » (le fichier l'emporte jour par jour) ou « Remplacer tout ». Écriture en une transaction.
+- **Import** : `ACTION_OPEN_DOCUMENT`. Valider entièrement avant d'écrire quoi que ce soit (format, version, dates, bornes, codes d'humeur et de symptôme inconnus, longueur de la note) ; en cas d'erreur, ne rien modifier et afficher un message précis. Proposer « Fusionner » (le fichier l'emporte jour par jour) ou « Remplacer tout ». Écriture en une transaction.
 - Une version de schéma inconnue (supérieure) est refusée proprement. Toute évolution du schéma incrémente `version` et ajoute une migration de lecture.
 
 ## Calcul des cycles et prévisions (`domain/`)
@@ -114,7 +132,7 @@ Kotlin pur, déterministe, sans effet de bord : `Predictor.predict(logs, today):
 
 **Statistiques**
 
-- Sur les 12 derniers cycles valides au plus : durée moyenne pondérée (les cycles récents pèsent davantage), écart-type, durée moyenne des règles.
+- Sur les 12 derniers cycles valides au plus : durée moyenne pondérée (les cycles récents pèsent davantage), écart-type, durée moyenne des règles (moyenne simple, non pondérée : des règles mal notées un mois ne doivent pas peser davantage).
 - Moins de 2 cycles valides : valeurs par défaut (cycle 28 j, règles 5 j) et fiabilité « faible ».
 - Pondération : poids linéaires (le plus ancien des cycles retenus pèse 1, le plus récent n) ; l'écart-type utilise les mêmes poids.
 - Fiabilité : faible < 2 cycles valides ; très bonne ≥ 6 cycles et écart-type ≤ 2 j ; bonne ≥ 4 cycles et écart-type ≤ 4 j ; moyenne sinon. Marge ± 3 j quand on utilise les valeurs par défaut.
@@ -128,8 +146,8 @@ Kotlin pur, déterministe, sans effet de bord : `Predictor.predict(logs, today):
 
 **Affinage par l'humeur (syndrome prémenstruel)**
 
-- Pour chaque cycle passé, chercher le premier jour d'« humeur basse » (`mood ≤ 2`) dans les 7 jours précédant les règles, et retenir son écart en jours avec le début des règles.
-- Le signal est considéré fiable s'il est présent dans au moins 3 cycles et au moins la moitié des cycles analysés, avec un écart-type ≤ 1,5 j. Un cycle est « analysé » s'il a au moins une humeur saisie dans les 7 jours précédant les règles.
+- Pour chaque cycle passé, chercher le premier jour d'« humeur basse » (au moins une humeur basse parmi celles du jour, voir `Mood.isLow`, ou une irritabilité ≥ 2 : `SymptomLog.isPmsSignalDay`) dans les 7 jours précédant les règles, et retenir son écart en jours avec le début des règles.
+- Le signal est considéré fiable s'il est présent dans au moins 3 cycles et au moins la moitié des cycles analysés, avec un écart-type ≤ 1,5 j. Un cycle est « analysé » s'il a au moins une humeur ou un niveau d'irritabilité (même 0) saisi dans les 7 jours précédant les règles.
 - Arc « SPM probable » de l'anneau : si le signal est fiable, de (prochaines règles − écart médian) à la veille des règles ; sinon les 5 derniers jours du cycle (affichés plus discrètement).
 - Quand le signal est fiable et qu'une humeur basse est saisie dans la fin du cycle en cours (à partir de « date prévue − 8 jours »), calculer une seconde estimation = date de cette humeur + écart médian, puis la combiner à l'estimation statistique par moyenne pondérée par l'inverse des variances. La marge se resserre en conséquence.
 - Cet affinage déplace les prochaines règles, donc aussi l'ovulation du cycle suivant.
@@ -149,11 +167,11 @@ Kotlin pur, déterministe, sans effet de bord : `Predictor.predict(logs, today):
 Barre du bas à 4 onglets (Cycle, Calendrier, Analyse, Réglages) avec un **gros bouton + central**, présent sur les quatre écrans.
 
 1. **Cycle** — anneau représentant le cycle en cours : arc des règles (à partir du haut), arc de la fenêtre fertile, arc « SPM probable » en fin de cycle, curseur blanc sur le jour courant, « Jour N sur M » et la phase au centre. Dessiné avec `Canvas` Compose. Dessous : cartes « Ovulation estimée » et « Prochaines règles » (date, « dans N j », marge).
-2. **Calendrier** — liste verticale de mois défilante (`LazyColumn`), trois mois visibles d'un coup d'œil, semaine commençant le lundi. Jour de règles saisi : pastille pleine corail ; règles prévues : contour pointillé corail ; fenêtre fertile : fond turquoise léger ; ovulation : pastille pleine turquoise ; aujourd'hui : contour blanc ; événement remarquable : petit point jaune. Toucher un jour ouvre son détail.
+2. **Calendrier** — liste verticale de mois défilante (`LazyColumn`), trois mois visibles d'un coup d'œil, semaine commençant le lundi. Jour de règles saisi : pastille pleine corail ; règles prévues : contour pointillé corail ; fenêtre fertile : fond turquoise léger ; ovulation : pastille pleine turquoise ; aujourd'hui : contour blanc ; événement remarquable : point jaune (rayon 4,5 dp) sous le jour. Toucher un jour ouvre son détail.
 3. **Détail d'un jour** — liste des éléments du jour, chacun avec « Modifier » et « Supprimer », et un bouton « Ajouter à ce jour ».
 4. **Ajout / édition** (bouton +) — sélecteur de date (aujourd'hui par défaut, pas de date future), puis trois types :
-   - **Règles** : flux (4 niveaux), douleur (0–4), fatigue (0–4), humeur (obligatoire).
-   - **Humeur** : 5 visages.
+   - **Règles** : flux (4 niveaux), douleur (0–4).
+   - **Symptômes** : page « Symptômes du jour » par cartes de catégorie (humeur en visages, irritabilité et fatigue, puces à cocher avec emoji, note « Autre »).
    - **Événement** : icône éclair + titre.
      Le même écran sert à l'édition (champs préremplis).
 5. **Analyse** — cycle moyen, variabilité, durée des règles ; barres des durées des derniers cycles avec la moyenne ; prévision (dates + intervalles + fiabilité) ; explication du signal d'humeur ; rappel « ni avis médical ni contraception ».
@@ -181,16 +199,16 @@ Thème sombre unique, validé sur maquettes. Ne pas utiliser les couleurs dynami
 
 - Typographie : Space Grotesk (titres, chiffres) et Inter (texte), **embarquées dans `res/font`** — jamais de polices téléchargeables (réseau).
 - Rayons : cartes 18 dp, boutons de choix 14 dp, bouton principal en pilule de 56 dp de haut, bouton + rond de 68 dp.
-- Humeurs : 5 visages vectoriels dessinés (composant `MoodFace`), pas des emoji système, pour un rendu identique sur tous les appareils. Événement remarquable : icône éclair vectorielle jaune.
+- Humeurs : 9 visages vectoriels dessinés (composant `MoodFace`) inspirés des emoji 😁 🙂 😐 😒 😔 😫 🥺 😭 😰, pas des emoji système (🥺 n'existe pas sur Android 8). Puces de symptômes : emoji système limités à Emoji 5.0 (présents dès Android 8) ; le spotting utilise la goutte vectorielle corail. Événement remarquable : icône éclair vectorielle jaune.
 - Accessibilité : cibles tactiles ≥ 48 dp, contraste texte ≥ 4,5:1, `contentDescription` sur l'anneau, les visages et les jours du calendrier (ex. « 9 novembre, règles, événement remarquable »). L'information ne repose jamais sur la couleur seule (plein / pointillé / contour).
 - Si des maquettes sont présentes dans `docs/maquettes/`, elles font référence pour la mise en page.
 
 ## Tests
 
 - `domain/` : couverture complète du découpage en cycles et du `Predictor` — historique vide, un seul cycle, cycles réguliers, irréguliers, valeurs aberrantes, trou d'un jour dans les règles, retard, signal d'humeur fiable / non fiable.
-- `data/` : invariant humeur/règles au niveau du dépôt ; aller-retour export → import identique ; import invalide ne modifie rien ; la base ne s'ouvre pas sans la clé.
+- `data/` : symptômes (enregistrement, remplacement, suppression, restauration) au niveau du dépôt ; migration de base 1 → 2 ; lecture des exports v1 ; aller-retour export → import identique ; import invalide ne modifie rien ; la base ne s'ouvre pas sans la clé.
 - Manifeste : un test (ou une tâche Gradle de vérification) échoue si le manifeste fusionné contient `android.permission.INTERNET`.
-- UI : ajouter un jour de règles (enregistrement impossible sans humeur), modifier, supprimer.
+- UI : ajouter un jour de règles, ajouter plusieurs symptômes, modifier, supprimer.
 - Pas d'émulateur dans le conteneur : les tests DAO, dépôt et UI Compose tournent sous Robolectric dans `testDebugUnitTest` (SQLite non chiffré, base en mémoire via `TestContainer`). Les tests propres à SQLCipher et au Keystore (`androidTest/…/EncryptedDatabaseTest`) demandent un appareil.
 - Captures d'écran de contrôle (rendu Robolectric natif) : `./gradlew testDebugUnitTest --tests '*ScreenshotTour' -Pselene.screenshots=<dossier>`.
 

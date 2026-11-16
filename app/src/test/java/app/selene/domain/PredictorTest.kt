@@ -4,6 +4,7 @@ import app.selene.domain.model.CyclePhase
 import app.selene.domain.model.DayLog
 import app.selene.domain.model.Mood
 import app.selene.domain.model.Reliability
+import app.selene.domain.model.SymptomLog
 import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -71,6 +72,20 @@ class PredictorTest {
         assertEquals(1, c.nextPeriod.marginDays)
         assertEquals(CyclePhase.MENSTRUATION, c.phase)
         assertEquals(4, c.dayOfCycle)
+    }
+
+    @Test
+    fun `the formula shown on the Analysis screen gives the weighted mean`() {
+        val lengths = listOf(27, 28, 30, 28, 27, 29)
+        val logs = history { cycles(start, lengths) }
+        val p = Predictor.predict(logs, start.plusDays(lengths.sum() + 3L))
+        val kept = Predictor.statisticsCycles(p.cycles).map { it.length!! }
+        val weights = Predictor.cycleWeights(kept.size)
+        assertEquals(lengths, kept)
+        assertEquals(listOf(1, 2, 3, 4, 5, 6), weights)
+        val shown = kept.zip(weights).sumOf { (l, w) -> l * w }.toDouble() / weights.sum()
+        assertEquals(p.stats.averageCycleLength, shown, 1e-9)
+        assertEquals(594.0 / 21, shown, 1e-9) // shown as 28,3
     }
 
     @Test
@@ -207,7 +222,7 @@ class PredictorTest {
             val next = starts[i + 1]
             // a neutral mood in the window so the cycle counts as analysed
             h.mood(next.minusDays(7), Mood.NEUTRAL)
-            if (offset != null) h.mood(next.minusDays(offset.toLong()), Mood.BAD)
+            if (offset != null) h.mood(next.minusDays(offset.toLong()), Mood.SAD)
         }
         h.extra(starts)
         return h.build()
@@ -226,10 +241,53 @@ class PredictorTest {
     @Test
     fun `the first low mood of the window is used`() {
         val logs = pmsHistory(listOf(3, 3, 3)) { starts ->
-            starts.drop(1).forEach { mood(it.minusDays(1), Mood.VERY_BAD) }
+            starts.drop(1).forEach { mood(it.minusDays(1), Mood.CRYING) }
         }
         val s = Predictor.predict(logs, date("2026-06-01")).pmsSignal
         assertEquals(3.0, s.medianOffsetDays)
+    }
+
+    @Test
+    fun `a day counts as low mood when any of its moods is low`() {
+        val h = TestHistory()
+        val starts = h.cycles(start, List(4) { 28 })
+        starts.drop(1).forEach { next ->
+            h.mood(next.minusDays(4), Mood.ANNOYED) // not low: analysed only
+            h.mood(next.minusDays(2), Mood.JOYFUL, Mood.ANXIOUS)
+        }
+        val s = Predictor.predict(h.build(), date("2026-06-01")).pmsSignal
+        assertEquals(4, s.cyclesAnalyzed)
+        assertEquals(2.0, s.medianOffsetDays)
+        assertTrue(s.isReliable)
+        assertEquals(
+            setOf(Mood.SAD, Mood.DRAINED, Mood.FRAGILE, Mood.CRYING, Mood.ANXIOUS),
+            Mood.entries.filter { it.isLow }.toSet(),
+        )
+    }
+
+    @Test
+    fun `a moderate irritability counts as low mood, a slight one does not`() {
+        val h = TestHistory()
+        val starts = h.cycles(start, List(4) { 28 })
+        starts.drop(1).forEach { next ->
+            h.irritability(next.minusDays(5), 1) // slight: analysed only
+            h.irritability(next.minusDays(3), SymptomLog.PMS_IRRITABILITY_THRESHOLD)
+        }
+        val s = Predictor.predict(h.build(), date("2026-06-01")).pmsSignal
+        assertEquals(4, s.cyclesAnalyzed)
+        assertEquals(4, s.cyclesWithSignal)
+        assertEquals(3.0, s.medianOffsetDays)
+        assertTrue(s.isReliable)
+    }
+
+    @Test
+    fun `a noted irritability of 0 makes a cycle analysed`() {
+        val logs = history {
+            cycles(start, List(4) { 28 }).drop(1).forEach { irritability(it.minusDays(2), 0) }
+        }
+        val s = Predictor.predict(logs, date("2026-06-01")).pmsSignal
+        assertEquals(4, s.cyclesAnalyzed)
+        assertEquals(0, s.cyclesWithSignal)
     }
 
     @Test
@@ -270,7 +328,7 @@ class PredictorTest {
         var s = start
         val logs = pmsHistory(listOf(2, 2, 2, 2)) { starts ->
             s = starts.last()
-            mood(s.plusDays(24), Mood.BAD) // statistical date is s+28, mood estimate s+26
+            mood(s.plusDays(24), Mood.SAD) // statistical date is s+28, mood estimate s+26
         }
         val p = Predictor.predict(logs, s.plusDays(25))
         val c = p.current!!
@@ -288,11 +346,24 @@ class PredictorTest {
     }
 
     @Test
+    fun `an irritable day at the end of the cycle refines the next period`() {
+        var s = start
+        val logs = pmsHistory(listOf(2, 2, 2, 2)) { starts ->
+            s = starts.last()
+            irritability(s.plusDays(24), 3)
+        }
+        val c = Predictor.predict(logs, s.plusDays(25)).current!!
+        assertTrue(c.refinedByMood)
+        assertEquals(s.plusDays(24), c.refinementMoodDate)
+        assertEquals(s.plusDays(27), c.nextPeriod.date)
+    }
+
+    @Test
     fun `a low mood before the end-of-cycle window is ignored`() {
         var s = start
         val logs = pmsHistory(listOf(2, 2, 2, 2)) { starts ->
             s = starts.last()
-            mood(s.plusDays(15), Mood.BAD) // before s+28-8
+            mood(s.plusDays(15), Mood.SAD) // before s+28-8
         }
         val c = Predictor.predict(logs, s.plusDays(22)).current!!
         assertFalse(c.refinedByMood)
@@ -304,7 +375,7 @@ class PredictorTest {
         var s = start
         val logs = pmsHistory(listOf(2, 2)) { starts ->
             s = starts.last()
-            mood(s.plusDays(24), Mood.BAD)
+            mood(s.plusDays(24), Mood.SAD)
         }
         val c = Predictor.predict(logs, s.plusDays(25)).current!!
         assertFalse(c.refinedByMood)
