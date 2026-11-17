@@ -16,7 +16,8 @@ Toutes les commandes ci-dessous se lancent depuis la racine du projet (`/workspa
 
 ```sh
 ./gradlew assembleDebug        # APK de debug → app/build/outputs/apk/debug/app-debug.apk
-./gradlew assembleRelease      # APK release minifié, NON signé → app/build/outputs/apk/release/
+./gradlew assembleRelease      # APK release minifié → app/build/outputs/apk/release/selene-<version>-release.apk
+                               # (signé si keystore.properties existe, sinon -unsigned)
 ./gradlew clean                # repartir de zéro
 ```
 
@@ -56,38 +57,58 @@ Rendu Robolectric natif de tous les écrans, sans appareil :
 
 ## Installer et déboguer
 
-```sh
-./gradlew installDebug                                  # compile et installe sur l'appareil connecté
-adb install -r app/build/outputs/apk/debug/app-debug.apk # installer un APK déjà compilé (-r : mise à jour)
-adb shell am start -n app.selene/.MainActivity           # lancer l'application
-adb logcat --pid=$(adb shell pidof app.selene)          # logs de l'application seule
-adb uninstall app.selene                                # désinstaller (EFFACE les données)
-```
-
-Sans câble ni adb : copier l'APK sur le téléphone et l'ouvrir, après avoir autorisé l'installation depuis des sources inconnues pour le gestionnaire de fichiers.
-
-> ⚠️ Un APK ne s'installe par-dessus un autre que s'il est signé avec la **même clé**. Changer de clé (debug d'une autre machine, passage debug → release) impose une désinstallation, qui efface la base chiffrée. **Faire un export JSON avant** (Réglages → Exporter).
-
-## Version release signée
-
-`assembleRelease` produit un APK non signé (aucune configuration de signature dans le projet). Pour le signer :
+Le build debug a pour identifiant `app.selene.debug` (nom affiché « Sélène (debug) ») : il s'installe **à côté** de la version publiée `app.selene`, avec ses propres données.
 
 ```sh
-# 1. Une seule fois : créer la clé. À conserver précieusement et hors du dépôt :
-#    sans elle, aucune mise à jour ne pourra être installée par-dessus.
-keytool -genkeypair -v -keystore ~/selene-release.jks -alias selene \
-        -keyalg RSA -keysize 4096 -validity 10000
-
-# 2. Compiler, aligner, signer, vérifier
-./gradlew assembleRelease
-BT=$ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)
-$BT/zipalign -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk app/build/selene-aligned.apk
-$BT/apksigner sign --ks ~/selene-release.jks --ks-key-alias selene \
-        --out app/build/selene-release.apk app/build/selene-aligned.apk
-$BT/apksigner verify --print-certs app/build/selene-release.apk
+./gradlew installDebug                                        # compile et installe sur l'appareil connecté
+adb install -r app/build/outputs/apk/debug/selene-*-debug.apk # installer un APK déjà compilé (-r : mise à jour)
+adb shell am start -n app.selene.debug/app.selene.MainActivity # lancer l'application
+adb logcat --pid=$(adb shell pidof app.selene.debug)          # logs de l'application seule
+adb uninstall app.selene.debug                                # désinstaller (EFFACE les données)
 ```
 
-Avant chaque nouvelle version, incrémenter `versionCode` (et `versionName`) dans `app/build.gradle.kts`.
+> ⚠️ Un APK ne s'installe par-dessus un autre que s'il est signé avec la **même clé**. Changer de clé impose une désinstallation, qui efface la base chiffrée. **Faire un export JSON avant** (Réglages → Exporter).
+
+## Publier une version (GitHub Releases + Obtainium)
+
+### Une seule fois : la clé de signature
+
+```sh
+keytool -genkeypair -v -keystore release.jks -alias selene -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Puis créer `keystore.properties` à la racine :
+
+```properties
+storeFile=release.jks
+storePassword=…
+keyAlias=selene
+keyPassword=…
+```
+
+`release.jks` et `keystore.properties` sont ignorés par git. **Sauvegarder les deux** (gestionnaire de mots de passe, clé USB) : sans cette clé, plus aucune mise à jour ne pourra s'installer par-dessus l'application des utilisatrices.
+
+### À chaque version
+
+1. Incrémenter `versionCode` (+1) et `versionName` (ex. `0.2.0`) dans `app/build.gradle.kts`.
+2. `./gradlew testDebugUnitTest lint assembleRelease`
+3. Vérifier la signature (doit afficher votre certificat, pas `CN=Android Debug`) :
+   ```sh
+   BT=$ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)
+   $BT/apksigner verify --print-certs app/build/outputs/apk/release/selene-0.2.0-release.apk
+   ```
+4. Commiter, créer le tag `v0.2.0` et le pousser : `git tag v0.2.0 && git push origin main v0.2.0`.
+5. Sur GitHub → _Releases_ → _Draft a new release_ → choisir le tag `v0.2.0`, écrire les nouveautés, joindre l'APK, _Publish_.
+
+Obtainium compare le tag de la release (`v0.2.0`) au `versionName` installé : garder les deux identiques.
+
+### Côté utilisatrice
+
+1. Installer [Obtainium](https://github.com/ImranR98/Obtainium/releases) (une seule autorisation « sources inconnues », pour Obtainium).
+2. Obtainium → _Ajouter une application_ → `https://github.com/superrache/selene` → _Installer_.
+3. Les mises à jour sont ensuite proposées par Obtainium.
+
+Le dépôt doit être **public** pour qu'Obtainium le lise sans jeton.
 
 ## Inspecter un APK
 
@@ -105,3 +126,13 @@ $BT/aapt2 dump badging app/build/outputs/apk/debug/app-debug.apk | head -3  # pa
 ./gradlew --stop                  # arrêter le démon (en cas de comportement étrange)
 ./gradlew assembleDebug --offline # compiler sans réseau (dépendances en cache)
 ```
+
+## Licence
+
+Sélène est un logiciel libre distribué sous la licence **GNU GPL v3 ou ultérieure** (`GPL-3.0-or-later`) : voir [`LICENSE`](LICENSE). Toute version modifiée et redistribuée doit rester libre, sous la même licence, avec son code source.
+
+Composants tiers embarqués :
+
+- Polices Space Grotesk et Inter (`app/src/main/res/font/`) : SIL Open Font License 1.1.
+- Bibliothèques AndroidX, Kotlin et kotlinx : Apache License 2.0.
+- SQLCipher Community Edition : licence de type BSD (Zetetic).

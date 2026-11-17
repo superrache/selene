@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.selene.R
 import app.selene.data.LogRepository
+import app.selene.domain.FullMoons
 import app.selene.domain.model.DayLog
 import app.selene.domain.model.Prediction
 import kotlinx.coroutines.channels.Channel
@@ -16,6 +17,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 
 data class DayUiState(
     val date: LocalDate,
@@ -24,6 +27,8 @@ data class DayUiState(
     val predictedPeriod: Boolean = false,
     val fertile: Boolean = false,
     val ovulation: Boolean = false,
+    /** Local time of the full moon when it falls on this day. */
+    val fullMoon: LocalTime? = null,
     val loaded: Boolean = false,
 ) {
     val isFuture: Boolean get() = date.isAfter(today)
@@ -37,7 +42,10 @@ class DayViewModel(
     prediction: Flow<Prediction?>,
     today: StateFlow<LocalDate>,
     val date: LocalDate,
+    zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
+    private val fullMoon = FullMoons.on(date, zone)?.toLocalTime()
+
     val state: StateFlow<DayUiState> = combine(repository.day(date), prediction, today) { day, p, t ->
         DayUiState(
             date = date,
@@ -46,6 +54,7 @@ class DayViewModel(
             predictedPeriod = day.period == null && date.isAfter(t) && p?.upcomingPeriods?.any { date in it } == true,
             fertile = p?.fertileWindows?.any { date in it.range } == true,
             ovulation = p?.fertileWindows?.any { it.ovulation == date } == true,
+            fullMoon = fullMoon,
             loaded = true,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DayUiState(date, today.value, DayLog(date)))

@@ -52,6 +52,7 @@ import app.selene.ui.flowLabelRes
 import app.selene.ui.labelRes
 import app.selene.ui.theme.SeleneColors
 import app.selene.ui.theme.SeleneDimens
+import java.time.LocalTime
 
 @Composable
 fun DayScreen(
@@ -97,6 +98,7 @@ fun DayScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             PredictionBadges(state)
+            state.fullMoon?.let { FullMoonItem(it) }
             val day = state.day
             day.period?.let { PeriodItem(it, onEdit = { onEdit(EntryKind.PERIOD, null) }, onDelete = { viewModel.deletePeriod() }) }
             day.symptoms?.let { symptoms ->
@@ -137,6 +139,18 @@ private fun PredictionBadges(state: DayUiState) {
                     .padding(vertical = 4.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun FullMoonItem(time: LocalTime) {
+    SeleneCard(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.day_full_moon), style = MaterialTheme.typography.titleMedium, color = SeleneColors.TextPrimary)
+        Text(
+            stringResource(R.string.day_full_moon_time, DateFormats.time(time)),
+            style = MaterialTheme.typography.bodyMedium,
+            color = SeleneColors.TextSecondary,
+        )
     }
 }
 

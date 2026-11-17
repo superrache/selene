@@ -59,6 +59,7 @@ const val CALENDAR_LIST_TAG = "calendar_months"
 private val CellHeight = 48.dp
 private val MarkSize = 36.dp
 private val EventDotRadius = 4.5.dp
+private val MoonDotRadius = 3.5.dp
 
 @Composable
 fun CalendarScreen(viewModel: CalendarViewModel, onDayClick: (LocalDate) -> Unit) {
@@ -157,6 +158,7 @@ private fun DayCell(date: LocalDate, state: CalendarUiState, onDayClick: (LocalD
     val isOvulation = !isPeriod && date in state.ovulationDays
     val isToday = date == state.today
     val hasEvent = date in state.eventDays
+    val isFullMoon = date in state.fullMoonDays
     val fertileBefore = date.minusDays(1) in state.fertileDays && date.dayOfWeek != DayOfWeek.MONDAY && date.dayOfMonth != 1
     val fertileAfter = date.plusDays(1) in state.fertileDays && date.dayOfWeek != DayOfWeek.SUNDAY &&
         date.dayOfMonth != date.lengthOfMonth()
@@ -170,6 +172,7 @@ private fun DayCell(date: LocalDate, state: CalendarUiState, onDayClick: (LocalD
         else if (isFertile) add(stringResource(R.string.cal_desc_fertile))
         if (date in state.symptomDays) add(stringResource(R.string.cal_desc_symptoms))
         if (hasEvent) add(stringResource(R.string.cal_desc_event))
+        if (isFullMoon) add(stringResource(R.string.cal_desc_full_moon))
     }.joinToString(", ")
 
     val textColor = when {
@@ -208,11 +211,22 @@ private fun DayCell(date: LocalDate, state: CalendarUiState, onDayClick: (LocalD
                     )
                 }
                 if (isToday) drawCircle(SeleneColors.TextPrimary, mark / 2 + 2.5.dp.toPx(), c, style = Stroke(2.dp.toPx()))
+                // Dots sit under the day mark, ringed with the background so they stay visible on any mark.
+                // With both an event and a full moon, they sit side by side (moon left, event right).
+                val dotY = c.y + mark / 2 - 1.dp.toPx()
+                val halo = 1.5.dp.toPx()
+                val eventR = EventDotRadius.toPx()
+                val moonR = MoonDotRadius.toPx()
+                val both = hasEvent && isFullMoon
+                if (isFullMoon) {
+                    val dot = Offset(if (both) c.x - moonR - halo else c.x, dotY)
+                    drawCircle(SeleneColors.Background, moonR + halo, dot)
+                    drawCircle(SeleneColors.TextPrimary, moonR, dot)
+                }
                 if (hasEvent) {
-                    // Under the day mark, ringed with the background so it stays visible on any mark.
-                    val dot = Offset(c.x, c.y + mark / 2 - 1.dp.toPx())
-                    drawCircle(SeleneColors.Background, EventDotRadius.toPx() + 1.5.dp.toPx(), dot)
-                    drawCircle(SeleneColors.Event, EventDotRadius.toPx(), dot)
+                    val dot = Offset(if (both) c.x + eventR + halo else c.x, dotY)
+                    drawCircle(SeleneColors.Background, eventR + halo, dot)
+                    drawCircle(SeleneColors.Event, eventR, dot)
                 }
             },
         contentAlignment = Alignment.Center,
@@ -244,6 +258,7 @@ private fun Legend() {
             drawRoundRect(SeleneColors.Fertile.copy(alpha = 0.3f), cornerRadius = CornerRadius(size.height / 2))
         }
         LegendMark(stringResource(R.string.cal_legend_event)) { drawCircle(SeleneColors.Event, size.minDimension / 2.6f) }
+        LegendMark(stringResource(R.string.cal_legend_full_moon)) { drawCircle(SeleneColors.TextPrimary, size.minDimension / 3.4f) }
     }
 }
 

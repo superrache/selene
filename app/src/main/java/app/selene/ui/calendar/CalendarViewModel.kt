@@ -3,6 +3,7 @@ package app.selene.ui.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.selene.data.LogRepository
+import app.selene.domain.FullMoons
 import app.selene.domain.model.DayLog
 import app.selene.domain.model.Prediction
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 
 /** What to draw on each day. Sets are cheap to query from the grid. */
 data class CalendarUiState(
@@ -23,6 +25,7 @@ data class CalendarUiState(
     val ovulationDays: Set<LocalDate> = emptySet(),
     val eventDays: Set<LocalDate> = emptySet(),
     val symptomDays: Set<LocalDate> = emptySet(),
+    val fullMoonDays: Set<LocalDate> = emptySet(),
 ) {
     val currentMonthIndex: Int get() = months.indexOf(YearMonth.from(today)).coerceAtLeast(0)
 
@@ -30,7 +33,12 @@ data class CalendarUiState(
         const val MONTHS_BEFORE = 12L
         const val MONTHS_AFTER = 6L
 
-        fun build(days: List<DayLog>, prediction: Prediction?, today: LocalDate): CalendarUiState {
+        fun build(
+            days: List<DayLog>,
+            prediction: Prediction?,
+            today: LocalDate,
+            zone: ZoneId = ZoneId.systemDefault(),
+        ): CalendarUiState {
             val current = YearMonth.from(today)
             val first = listOfNotNull(days.firstOrNull()?.date?.let(YearMonth::from), current.minusMonths(MONTHS_BEFORE)).min()
             val last = current.plusMonths(MONTHS_AFTER)
@@ -52,6 +60,7 @@ data class CalendarUiState(
                 ovulationDays = ovulation,
                 eventDays = days.filter { it.events.isNotEmpty() }.map { it.date }.toSet(),
                 symptomDays = days.filter { it.symptoms != null }.map { it.date }.toSet(),
+                fullMoonDays = FullMoons.between(months.first().atDay(1), last.atEndOfMonth(), zone).keys,
             )
         }
     }

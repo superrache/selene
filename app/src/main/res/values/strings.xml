@@ -151,6 +151,8 @@
     <string name="day_predicted_period">Règles prévues</string>
     <string name="day_fertile">Fenêtre fertile estimée</string>
     <string name="day_ovulation">Ovulation estimée</string>
+    <string name="day_full_moon">🌕 Pleine lune</string>
+    <string name="day_full_moon_time">Lune pleine à %1$s</string>
     <string name="day_future_info">Vous pourrez noter ce jour quand il sera arrivé.</string>
     <string name="day_deleted_period">Jour de règles supprimé</string>
     <string name="day_deleted_symptoms">Symptômes supprimés</string>
@@ -190,9 +192,11 @@
     <string name="cal_desc_ovulation">ovulation estimée</string>
     <string name="cal_desc_event">événement remarquable</string>
     <string name="cal_desc_symptoms">symptômes notés</string>
+    <string name="cal_desc_full_moon">pleine lune</string>
     <string name="cal_legend_predicted">Prévues</string>
     <string name="cal_legend_ovulation">Ovulation</string>
     <string name="cal_legend_event">Événement</string>
+    <string name="cal_legend_full_moon">Pleine lune</string>
 
     <!-- Analysis -->
     <string name="analysis_title">Analyse</string>

@@ -99,6 +99,11 @@ class ScreenshotTour {
         val day = hasContentDescription(DateFormats.dayMonth(today.minusDays(3)), substring = true)
         compose.onNodeWithTag(app.selene.ui.calendar.CALENDAR_LIST_TAG).performScrollToNode(day)
         compose.onNode(day).performClick(); shot("10-day-detail")
+        compose.onNodeWithContentDescription("Retour").performClick()
+        val fullMoon = app.selene.domain.FullMoons.between(today, today.plusDays(40), java.time.ZoneId.systemDefault()).keys.first()
+        val moonDay = hasContentDescription(DateFormats.dayMonth(fullMoon) + ",", substring = true)
+        compose.onNodeWithTag(app.selene.ui.calendar.CALENDAR_LIST_TAG).performScrollToNode(moonDay)
+        compose.onNode(moonDay).performClick(); shot("11-day-full-moon")
     }
 
     /** Launcher icon as the system draws it: circle mask, rounded-square mask, and themed (monochrome). */

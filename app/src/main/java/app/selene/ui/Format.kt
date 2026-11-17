@@ -13,6 +13,7 @@ import app.selene.domain.model.Reliability
 import app.selene.domain.model.Symptom
 import app.selene.domain.model.SymptomCategory
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -26,6 +27,7 @@ object DateFormats {
     private val weekday = DateTimeFormatter.ofPattern("EEEE", locale)
     private val shortWeekday = DateTimeFormatter.ofPattern("EEE", locale)
     private val monthYear = DateTimeFormatter.ofPattern("MMMM yyyy", locale)
+    private val time = DateTimeFormatter.ofPattern("H 'h' mm", locale)
 
     private fun day(date: LocalDate) = if (date.dayOfMonth == 1) "1er" else date.dayOfMonth.toString()
 
@@ -49,6 +51,9 @@ object DateFormats {
 
     /** "Novembre 2026" */
     fun monthYear(month: YearMonth): String = monthYear.format(month).capitalized()
+
+    /** "15 h 08" */
+    fun time(time: LocalTime): String = this.time.format(time)
 
     fun shortMonth(month: YearMonth): String = shortMonth.format(month)
 

@@ -1,5 +1,6 @@
 import com.android.build.api.artifact.SingleArtifact
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,6 +9,16 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
 }
+
+// Release signing: read from keystore.properties at the project root (never committed).
+// Without it, assembleRelease still works but produces an unsigned APK.
+val releaseSigning: Properties? = rootProject.file("keystore.properties")
+    .takeIf { it.isFile }
+    ?.let { file ->
+        val props = Properties()
+        file.inputStream().use { stream -> props.load(stream) }
+        props
+    }
 
 android {
     namespace = "app.selene"
@@ -22,8 +33,25 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseSigning != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseSigning.getProperty("storeFile"))
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias")
+                keyPassword = releaseSigning.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // Lets the debug build live next to the released app on the same phone.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -61,6 +89,11 @@ android {
         // Version-bump hints need the network; versions are checked by hand (see CLAUDE.md).
         disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
     }
+}
+
+// APK file name: selene-<versionName>-<buildType>.apk
+base {
+    archivesName = "selene-${android.defaultConfig.versionName}"
 }
 
 kotlin {
