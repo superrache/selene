@@ -58,6 +58,14 @@ object SeleneIcons {
     )
     val Back = icon("back", strokes = listOf("M15,5l-7,7 7,7"), width = 2.2f)
     val ChevronRight = icon("chevron_right", strokes = listOf("M9,5l7,7 -7,7"), width = 2.2f)
+    val Eye = icon(
+        "eye",
+        strokes = listOf("M2,12c2.5,-4.5 6,-7 10,-7s7.5,2.5 10,7c-2.5,4.5 -6,7 -10,7s-7.5,-2.5 -10,-7z", "M12,9a3,3 0 1,0 0.01,0z"),
+    )
+    val EyeOff = icon(
+        "eye_off",
+        strokes = listOf("M2,12c2.5,-4.5 6,-7 10,-7s7.5,2.5 10,7c-2.5,4.5 -6,7 -10,7s-7.5,-2.5 -10,-7z", "M12,9a3,3 0 1,0 0.01,0z", "M4,4l16,16"),
+    )
     val Close = icon("close", strokes = listOf("M6,6l12,12", "M18,6L6,18"), width = 2.2f)
     val Check = icon("check", strokes = listOf("M5,12.5l4.5,4.5L19,7"), width = 2.4f)
     val Lock = icon(

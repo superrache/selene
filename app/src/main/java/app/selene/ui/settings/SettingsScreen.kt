@@ -20,7 +20,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,7 +49,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,6 +63,7 @@ import app.selene.R
 import app.selene.data.LogRepository
 import app.selene.data.calendar.CalendarInfo
 import app.selene.data.calendar.PeriodCalendarSync
+import app.selene.data.json.ExportCrypto
 import app.selene.ui.appContainer
 import app.selene.ui.components.ScreenHeader
 import app.selene.ui.components.SectionTitle
@@ -83,7 +93,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        uri?.let(viewModel::export)
+        if (uri != null) viewModel.export(uri) else viewModel.cancelExport()
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.readImport(it, displayName(context, it)) }
@@ -198,13 +208,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
     // --- Dialogs ---
     when (confirm) {
-        Confirm.EXPORT -> ConfirmDialog(
-            title = stringResource(R.string.settings_export_warning_title),
-            text = stringResource(R.string.settings_export_warning),
-            confirmLabel = stringResource(R.string.action_continue),
+        Confirm.EXPORT -> ExportPasswordDialog(
             onDismiss = { confirm = null },
-            onConfirm = {
+            onConfirm = { password ->
                 confirm = null
+                viewModel.prepareExport(password)
                 appLock.allowExternalScreen()
                 exportLauncher.launch(viewModel.exportFileName)
             },
@@ -284,6 +292,14 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             },
         )
     }
+    dialogs.pendingDecrypt?.let { pending ->
+        DecryptDialog(
+            pending = pending,
+            onDismiss = viewModel::dismissImport,
+            onDecrypt = viewModel::decryptImport,
+        )
+    }
+    if (dialogs.exporting) WorkingDialog(stringResource(R.string.settings_export_working))
     dialogs.importError?.let { failure ->
         AlertDialog(
             onDismissRequest = viewModel::dismissImport,
@@ -408,6 +424,150 @@ private fun ConfirmDialog(
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun ExportPasswordDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    // Deliberately not rememberSaveable: the password must not end up in the saved instance state.
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var visible by remember { mutableStateOf(false) }
+    val longEnough = ExportCrypto.isAcceptablePassword(password)
+    val matches = password == confirmation
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SeleneColors.Surface,
+        title = { Text(stringResource(R.string.settings_export_password_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.settings_export_password_text))
+                PasswordField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = stringResource(R.string.settings_export_password),
+                    visible = visible,
+                    onToggleVisible = { visible = !visible },
+                    error = if (password.isNotEmpty() && !longEnough) {
+                        pluralStringResource(R.plurals.settings_export_password_too_short, ExportCrypto.MIN_PASSWORD_LENGTH, ExportCrypto.MIN_PASSWORD_LENGTH)
+                    } else {
+                        null
+                    },
+                )
+                PasswordField(
+                    value = confirmation,
+                    onValueChange = { confirmation = it },
+                    label = stringResource(R.string.settings_export_password_confirm),
+                    visible = visible,
+                    onToggleVisible = { visible = !visible },
+                    error = if (confirmation.isNotEmpty() && !matches) stringResource(R.string.settings_export_password_mismatch) else null,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(password) }, enabled = longEnough && matches) {
+                Text(stringResource(R.string.action_continue))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun DecryptDialog(pending: PendingDecrypt, onDismiss: () -> Unit, onDecrypt: (String) -> Unit) {
+    var password by remember(pending.fileName, pending.text) { mutableStateOf("") }
+    var visible by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = { if (!pending.working) onDismiss() },
+        containerColor = SeleneColors.Surface,
+        title = { Text(stringResource(R.string.settings_import_password_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.settings_import_password_text, pending.fileName))
+                PasswordField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = stringResource(R.string.settings_export_password),
+                    visible = visible,
+                    onToggleVisible = { visible = !visible },
+                    error = if (pending.wrongPassword) stringResource(R.string.settings_import_password_wrong) else null,
+                    enabled = !pending.working,
+                    onDone = { if (password.isNotEmpty()) onDecrypt(password) },
+                )
+                if (pending.working) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(20.dp), color = SeleneColors.Period, strokeWidth = 2.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.settings_import_working), color = SeleneColors.TextSecondary)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDecrypt(password) }, enabled = password.isNotEmpty() && !pending.working) {
+                Text(stringResource(R.string.settings_import_decrypt))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !pending.working) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun PasswordField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    visible: Boolean,
+    onToggleVisible: () -> Unit,
+    error: String?,
+    enabled: Boolean = true,
+    onDone: (() -> Unit)? = null,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = true,
+        enabled = enabled,
+        isError = error != null,
+        supportingText = error?.let { { Text(it) } },
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            autoCorrectEnabled = false,
+            imeAction = if (onDone != null) ImeAction.Done else ImeAction.Next,
+        ),
+        keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
+        trailingIcon = {
+            IconButton(onClick = onToggleVisible) {
+                Icon(
+                    if (visible) SeleneIcons.EyeOff else SeleneIcons.Eye,
+                    contentDescription = stringResource(if (visible) R.string.password_hide else R.string.password_show),
+                    tint = SeleneColors.TextSecondary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        },
+        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SeleneColors.Period, cursorColor = SeleneColors.Period),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun WorkingDialog(text: String) {
+    AlertDialog(
+        onDismissRequest = {},
+        containerColor = SeleneColors.Surface,
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(24.dp), color = SeleneColors.Period, strokeWidth = 2.dp)
+                Spacer(Modifier.width(16.dp))
+                Text(text)
+            }
+        },
+        confirmButton = {},
     )
 }
 

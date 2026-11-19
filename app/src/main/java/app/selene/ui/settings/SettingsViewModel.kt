@@ -9,6 +9,7 @@ import app.selene.R
 import app.selene.data.AppSettings
 import app.selene.data.LogRepository
 import app.selene.data.calendar.CalendarInfo
+import app.selene.data.json.ExportCrypto
 import app.selene.data.json.ImportError
 import app.selene.data.json.ImportResult
 import app.selene.data.json.JsonExport
@@ -31,10 +32,21 @@ import java.time.OffsetDateTime
 
 data class PendingImport(val fileName: String, val days: List<DayLog>)
 
+/** An encrypted export waiting for its password. */
+data class PendingDecrypt(
+    val fileName: String,
+    val text: String,
+    val wrongPassword: Boolean = false,
+    val working: Boolean = false,
+)
+
 data class SettingsDialogs(
     val calendars: List<CalendarInfo>? = null,
     val pendingImport: PendingImport? = null,
+    val pendingDecrypt: PendingDecrypt? = null,
     val importError: ImportFailure? = null,
+    /** Key derivation + encryption in progress. */
+    val exporting: Boolean = false,
 )
 
 /** Import failure: either a validation error or an I/O problem. */
@@ -85,38 +97,86 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
 
     // --- Export / import ---------------------------------------------------------------------
 
-    fun export(uri: Uri) = viewModelScope.launch {
-        val ok = withContext(Dispatchers.IO) {
-            runCatching {
-                val text = JsonExport.encode(logs.snapshot(), OffsetDateTime.now())
-                resolver.openOutputStream(uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) } ?: throw IOException()
-            }.isSuccess
+    /**
+     * Password chosen in the export dialog, kept only while the document picker is open.
+     * Held in memory only (never in saved state, preferences or logs).
+     */
+    private var exportPassword: String? = null
+
+    fun prepareExport(password: String) {
+        exportPassword = password
+    }
+
+    fun cancelExport() {
+        exportPassword = null
+    }
+
+    fun export(uri: Uri) {
+        val password = exportPassword
+        exportPassword = null
+        if (password == null) {
+            message(R.string.settings_export_failed)
+            return
         }
-        message(if (ok) R.string.settings_export_done else R.string.settings_export_failed)
+        _dialogs.update { it.copy(exporting = true) }
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.Default) {
+                runCatching {
+                    val plain = JsonExport.encode(logs.snapshot(), OffsetDateTime.now())
+                    val text = ExportCrypto.encrypt(plain, password)
+                    withContext(Dispatchers.IO) {
+                        resolver.openOutputStream(uri, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)) } ?: throw IOException()
+                    }
+                }.isSuccess
+            }
+            _dialogs.update { it.copy(exporting = false) }
+            message(if (ok) R.string.settings_export_done else R.string.settings_export_failed)
+        }
     }
 
     fun readImport(uri: Uri, displayName: String) = viewModelScope.launch {
-        val failure: ImportFailure?
-        val result = withContext(Dispatchers.IO) {
+        val read = withContext(Dispatchers.IO) {
             runCatching {
                 resolver.openInputStream(uri)?.use { input ->
                     val bytes = input.readNBytesCompat(JsonImport.MAX_BYTES + 1)
-                    if (bytes.size > JsonImport.MAX_BYTES) null else JsonImport.parse(bytes.toString(Charsets.UTF_8))
+                    if (bytes.size > JsonImport.MAX_BYTES) null else bytes.toString(Charsets.UTF_8)
                 } ?: throw IOException()
             }
         }
-        failure = when {
-            result.isFailure -> ImportFailure.Unreadable
-            result.getOrNull() == null -> ImportFailure.TooLarge
-            else -> (result.getOrNull() as? ImportResult.Failure)?.let { ImportFailure.Invalid(it.error) }
+        val text = read.getOrNull()
+        when {
+            read.isFailure -> showImportFailure(ImportFailure.Unreadable)
+            text == null -> showImportFailure(ImportFailure.TooLarge)
+            withContext(Dispatchers.Default) { ExportCrypto.isEncrypted(text) } ->
+                _dialogs.update { it.copy(importError = null, pendingImport = null, pendingDecrypt = PendingDecrypt(displayName, text)) }
+            // Plain exports (made before encryption existed) are still accepted.
+            else -> showParsed(displayName, withContext(Dispatchers.Default) { JsonImport.parse(text) })
         }
-        val success = result.getOrNull() as? ImportResult.Success
-        _dialogs.update {
-            it.copy(
-                importError = failure,
-                pendingImport = success?.let { s -> PendingImport(displayName, s.days) },
-            )
+    }
+
+    fun decryptImport(password: String) {
+        val pending = _dialogs.value.pendingDecrypt ?: return
+        if (pending.working) return
+        _dialogs.update { it.copy(pendingDecrypt = pending.copy(working = true, wrongPassword = false)) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.Default) { ExportCrypto.decrypt(pending.text, password) }
+            when (result) {
+                ExportCrypto.DecryptResult.WrongPassword ->
+                    _dialogs.update { it.copy(pendingDecrypt = pending.copy(working = false, wrongPassword = true)) }
+                is ExportCrypto.DecryptResult.Invalid -> showImportFailure(ImportFailure.Invalid(result.error))
+                is ExportCrypto.DecryptResult.Success ->
+                    showParsed(pending.fileName, withContext(Dispatchers.Default) { JsonImport.parse(result.plaintext) })
+            }
         }
+    }
+
+    private fun showImportFailure(failure: ImportFailure) =
+        _dialogs.update { it.copy(importError = failure, pendingImport = null, pendingDecrypt = null) }
+
+    private fun showParsed(fileName: String, result: ImportResult) = when (result) {
+        is ImportResult.Failure -> showImportFailure(ImportFailure.Invalid(result.error))
+        is ImportResult.Success ->
+            _dialogs.update { it.copy(importError = null, pendingDecrypt = null, pendingImport = PendingImport(fileName, result.days)) }
     }
 
     fun confirmImport(mode: LogRepository.ImportMode) {
@@ -128,7 +188,7 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    fun dismissImport() = _dialogs.update { it.copy(pendingImport = null, importError = null) }
+    fun dismissImport() = _dialogs.update { it.copy(pendingImport = null, pendingDecrypt = null, importError = null) }
 
     // --- Calendar ------------------------------------------------------------------------------
 
