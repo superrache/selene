@@ -40,6 +40,7 @@ app/src/main/java/app/selene/
     model/           DayLog, PeriodLog, SymptomLog, Mood, Symptom, NotableEvent, Cycle, Prediction
     CycleCalculator  découpe l'historique en cycles
     Predictor        statistiques + prévisions
+    FullMoons        pleines lunes (Meeus, ch. 49), sans position : seul le fuseau horaire compte
   data/
     db/              entités Room, DAO, base chiffrée, KeyStore wrapper
     LogRepository    seule porte d'entrée vers la base (Flow)
@@ -116,9 +117,25 @@ Tout événement est modifiable et supprimable après coup (depuis le détail d'
 - Un objet par jour ayant au moins une donnée ; `period`, `symptoms`, `events` (et chaque champ de `symptoms`) sont facultatifs ; jours triés par date.
 - Version 1 (lecture seule) : `mood` 1–5 et `period.fatigue` sont convertis comme dans la migration de base.
 - Les prévisions et les réglages ne sont pas exportés.
-- **Export** : `ACTION_CREATE_DOCUMENT`, nom proposé `selene-AAAA-MM-JJ.json`. Avant d'écrire, avertir que le fichier exporté n'est **pas chiffré**.
-- **Import** : `ACTION_OPEN_DOCUMENT`. Valider entièrement avant d'écrire quoi que ce soit (format, version, dates, bornes, codes d'humeur et de symptôme inconnus, longueur de la note) ; en cas d'erreur, ne rien modifier et afficher un message précis. Proposer « Fusionner » (le fichier l'emporte jour par jour) ou « Remplacer tout ». Écriture en une transaction.
+- **Export** : demander un mot de passe (au moins 8 caractères, saisi deux fois ; jamais conservé), puis `ACTION_CREATE_DOCUMENT`, nom proposé `selene-AAAA-MM-JJ.json`. Le fichier écrit est **toujours chiffré** (voir « Enveloppe chiffrée »).
+- **Import** : `ACTION_OPEN_DOCUMENT`. Un fichier chiffré demande son mot de passe (mot de passe faux ou fichier altéré : message, nouvel essai possible) ; un export en clair (ancien) est encore accepté sans mot de passe. Valider entièrement avant d'écrire quoi que ce soit (format, version, dates, bornes, codes d'humeur et de symptôme inconnus, longueur de la note) ; en cas d'erreur, ne rien modifier et afficher un message précis. Proposer « Fusionner » (le fichier l'emporte jour par jour) ou « Remplacer tout ». Écriture en une transaction.
 - Une version de schéma inconnue (supérieure) est refusée proprement. Toute évolution du schéma incrémente `version` et ajoute une migration de lecture.
+
+### Enveloppe chiffrée
+
+```json
+{
+  "format": "selene-encrypted",
+  "version": 1,
+  "kdf": { "name": "PBKDF2-HMAC-SHA256", "iterations": 600000, "salt": "<16 octets, base64>" },
+  "cipher": { "name": "AES-256-GCM", "iv": "<12 octets, base64>" },
+  "data": "<chiffré + tag GCM de 16 octets, base64>"
+}
+```
+
+- Clé = PBKDF2-HMAC-SHA256(mot de passe normalisé NFC puis UTF-8, sel), 32 octets. `data` = AES-256-GCM du JSON `selene-export` ci-dessus (UTF-8), tag de 128 bits ajouté à la fin. Sel et IV aléatoires à chaque export.
+- Code : `data/json/ExportCrypto`. Import : itérations acceptées de 10 000 à 10 000 000 (fichier piégé) ; `name` inconnu refusé.
+- Exemple : `docs/exemples/exemple-export-chiffre.json`, mot de passe `lune rousse 2026` (aussi en ressource de test).
 
 ## Calcul des cycles et prévisions (`domain/`)
 
@@ -167,8 +184,8 @@ Kotlin pur, déterministe, sans effet de bord : `Predictor.predict(logs, today):
 Barre du bas à 4 onglets (Cycle, Calendrier, Analyse, Réglages) avec un **gros bouton + central**, présent sur les quatre écrans.
 
 1. **Cycle** — anneau représentant le cycle en cours : arc des règles (à partir du haut), arc de la fenêtre fertile, arc « SPM probable » en fin de cycle, curseur blanc sur le jour courant, « Jour N sur M » et la phase au centre. Dessiné avec `Canvas` Compose. Dessous : cartes « Ovulation estimée » et « Prochaines règles » (date, « dans N j », marge).
-2. **Calendrier** — liste verticale de mois défilante (`LazyColumn`), trois mois visibles d'un coup d'œil, semaine commençant le lundi. Jour de règles saisi : pastille pleine corail ; règles prévues : contour pointillé corail ; fenêtre fertile : fond turquoise léger ; ovulation : pastille pleine turquoise ; aujourd'hui : contour blanc ; événement remarquable : point jaune (rayon 4,5 dp) sous le jour. Toucher un jour ouvre son détail.
-3. **Détail d'un jour** — liste des éléments du jour, chacun avec « Modifier » et « Supprimer », et un bouton « Ajouter à ce jour ».
+2. **Calendrier** — liste verticale de mois défilante (`LazyColumn`), trois mois visibles d'un coup d'œil, semaine commençant le lundi. Jour de règles saisi : pastille pleine corail ; règles prévues : contour pointillé corail ; fenêtre fertile : fond turquoise léger ; ovulation : pastille pleine turquoise ; aujourd'hui : contour blanc ; événement remarquable : point jaune (rayon 4,5 dp) sous le jour ; pleine lune : point blanc (rayon 3,5 dp) sous le jour, à gauche du point jaune s'il y en a un. Toucher un jour ouvre son détail.
+3. **Détail d'un jour** — liste des éléments du jour, chacun avec « Modifier » et « Supprimer », et un bouton « Ajouter à ce jour ». Les jours de pleine lune affichent une carte « 🌕 Pleine lune » avec l'heure locale (information, ni modifiable ni supprimable).
 4. **Ajout / édition** (bouton +) — sélecteur de date (aujourd'hui par défaut, pas de date future), puis trois types :
    - **Règles** : flux (4 niveaux), douleur (0–4).
    - **Symptômes** : page « Symptômes du jour » par cartes de catégorie (humeur en visages, irritabilité et fatigue, puces à cocher avec emoji, note « Autre »).
@@ -206,7 +223,7 @@ Thème sombre unique, validé sur maquettes. Ne pas utiliser les couleurs dynami
 ## Tests
 
 - `domain/` : couverture complète du découpage en cycles et du `Predictor` — historique vide, un seul cycle, cycles réguliers, irréguliers, valeurs aberrantes, trou d'un jour dans les règles, retard, signal d'humeur fiable / non fiable.
-- `data/` : symptômes (enregistrement, remplacement, suppression, restauration) au niveau du dépôt ; migration de base 1 → 2 ; lecture des exports v1 ; aller-retour export → import identique ; import invalide ne modifie rien ; la base ne s'ouvre pas sans la clé.
+- `data/` : symptômes (enregistrement, remplacement, suppression, restauration) au niveau du dépôt ; migration de base 1 → 2 ; lecture des exports v1 ; aller-retour export → import identique ; chiffrement de l'export (vecteurs PBKDF2, mauvais mot de passe, fichier altéré, exemple documenté) ; import invalide ne modifie rien ; la base ne s'ouvre pas sans la clé.
 - Manifeste : un test (ou une tâche Gradle de vérification) échoue si le manifeste fusionné contient `android.permission.INTERNET`.
 - UI : ajouter un jour de règles, ajouter plusieurs symptômes, modifier, supprimer.
 - Pas d'émulateur dans le conteneur : les tests DAO, dépôt et UI Compose tournent sous Robolectric dans `testDebugUnitTest` (SQLite non chiffré, base en mémoire via `TestContainer`). Les tests propres à SQLCipher et au Keystore (`androidTest/…/EncryptedDatabaseTest`) demandent un appareil.
