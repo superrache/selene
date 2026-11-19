@@ -90,15 +90,21 @@ keyPassword=…
 
 ### À chaque version
 
-1. Incrémenter `versionCode` (+1) et `versionName` (ex. `0.2.0`) dans `app/build.gradle.kts`.
-2. `./gradlew testDebugUnitTest lint assembleRelease`
-3. Vérifier la signature (doit afficher votre certificat, pas `CN=Android Debug`) :
+1. Lancer le script de publication avec le nouveau numéro de version :
    ```sh
-   BT=$ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)
-   $BT/apksigner verify --print-certs app/build/outputs/apk/release/selene-0.2.0-release.apk
+   ./release.sh 0.4.0
    ```
-4. Commiter, créer le tag `v0.2.0` et le pousser : `git tag v0.2.0 && git push origin main v0.2.0`.
-5. Sur GitHub → _Releases_ → _Draft a new release_ → choisir le tag `v0.2.0`, écrire les nouveautés, joindre l'APK, _Publish_.
+   Il vérifie que la version (`X.Y.Z`) est supérieure à l'actuelle, que le tag n'existe pas encore et que `keystore.properties` est présent, puis :
+   - incrémente `versionCode` (+1) et met `versionName` à jour dans `app/build.gradle.kts` ;
+   - lance `./gradlew testDebugUnitTest lint assembleRelease` (vérification du manifeste comprise) ;
+   - vérifie la signature de `app/build/outputs/apk/release/selene-0.4.0-release.apk` avec `apksigner` (échec si l'APK est signé avec la clé de debug).
+
+   En cas d'échec, la version d'origine est restaurée dans `app/build.gradle.kts`.
+2. Lancer la commande affichée à la fin pour commiter, créer le tag et le pousser :
+   ```sh
+   git commit -am "chore: release 0.4.0" && git tag v0.4.0 && git push origin main v0.4.0
+   ```
+3. Sur GitHub → _Releases_ → _Draft a new release_ → choisir le tag `v0.4.0`, écrire les nouveautés, joindre l'APK, _Publish_.
 
 Obtainium compare le tag de la release (`v0.2.0`) au `versionName` installé : garder les deux identiques.
 
