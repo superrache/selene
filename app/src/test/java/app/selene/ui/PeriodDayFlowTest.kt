@@ -32,10 +32,14 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import java.time.LocalDate
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+// Robolectric's default 320×470 dp screen puts some weeks of the current month under the
+// raised + button, so tapping "today" in the calendar depended on the date. Use a phone size.
+@Config(qualifiers = "w400dp-h860dp")
 @RunWith(AndroidJUnit4::class)
 class PeriodDayFlowTest {
     @get:Rule
