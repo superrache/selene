@@ -113,6 +113,17 @@ class PeriodDayFlowTest {
     }
 
     @Test
+    fun theDayAddSectionOffersOnlyMissingKindsAndOpensThemDirectly() {
+        runBlocking { container.logRepository.savePeriod(PeriodLog(today, 2, 1)) }
+        openTodayDetail()
+        val date = DateFormats.dayMonth(today)
+        compose.onNodeWithContentDescription("Ajouter des règles au $date").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Ajouter un événement au $date").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Ajouter des symptômes au $date").performScrollTo().performClick()
+        compose.onNodeWithText("Humeur").assertIsDisplayed()
+    }
+
+    @Test
     fun editingAPeriodDayFromItsDetail() {
         runBlocking { container.logRepository.savePeriod(PeriodLog(today, 2, 1)) }
         openTodayDetail()

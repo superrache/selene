@@ -114,7 +114,7 @@ fun SeleneNavHost(navController: NavHostController = rememberNavController()) {
                 DayScreen(
                     viewModel = seleneViewModel(key = "day-$date") { c, _ -> DayViewModel(c.logRepository, c.prediction, c.today, date) },
                     onBack = { navController.popBackStack() },
-                    onAdd = { openEntry(EntryRoute(date = date.toString())) },
+                    onAdd = { kind -> openEntry(EntryRoute(date = date.toString(), kind = kind.name)) },
                     onEdit = { kind, eventId ->
                         openEntry(EntryRoute(date = date.toString(), kind = kind.name, eventId = eventId, edit = true))
                     },

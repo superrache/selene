@@ -144,7 +144,10 @@
 
     <!-- Day detail -->
     <string name="day_nothing">Rien de noté ce jour-là.</string>
-    <string name="day_add">Ajouter à ce jour</string>
+    <string name="day_add_section">Ajouter</string>
+    <string name="day_add_period_description">Ajouter des règles au %1$s</string>
+    <string name="day_add_symptoms_description">Ajouter des symptômes au %1$s</string>
+    <string name="day_add_event_description">Ajouter un événement au %1$s</string>
     <string name="day_period_title">Règles · flux %1$s</string>
     <string name="day_period_detail">Douleur %1$d/4</string>
     <string name="day_symptoms_level" tools:ignore="PluralsCandidate">%1$s %2$d/4</string>

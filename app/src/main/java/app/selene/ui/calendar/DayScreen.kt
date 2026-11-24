@@ -1,6 +1,22 @@
 package app.selene.ui.calendar
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.selene.R
@@ -38,8 +55,8 @@ import app.selene.ui.DateFormats
 import app.selene.ui.components.EditDeleteRow
 import app.selene.ui.components.IconBadge
 import app.selene.ui.components.MoodFace
-import app.selene.ui.components.PrimaryButton
 import app.selene.ui.components.ScreenHeader
+import app.selene.ui.components.SectionTitle
 import app.selene.ui.components.SeleneCard
 import app.selene.ui.components.SeleneIcons
 import app.selene.ui.components.SymptomGlyph
@@ -58,7 +75,7 @@ import java.time.LocalTime
 fun DayScreen(
     viewModel: DayViewModel,
     onBack: () -> Unit,
-    onAdd: () -> Unit,
+    onAdd: (EntryKind) -> Unit,
     onEdit: (EntryKind, String?) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -115,9 +132,90 @@ fun DayScreen(
                     modifier = Modifier.padding(vertical = 16.dp),
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            if (!state.isFuture) PrimaryButton(stringResource(R.string.day_add), onClick = onAdd)
+            if (state.loaded && !state.isFuture) {
+                Spacer(Modifier.height(8.dp))
+                AddSection(state, onAdd)
+            }
         }
+    }
+}
+
+/**
+ * Direct "add" tiles, one per entry kind still possible on this day (period and symptoms
+ * are one per day; events are unlimited). Dashed outline, no filled coral: these must not
+ * read as a confirm button.
+ */
+@Composable
+private fun AddSection(state: DayUiState, onAdd: (EntryKind) -> Unit) {
+    val date = DateFormats.dayMonth(state.date)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle(stringResource(R.string.day_add_section))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (state.day.period == null) {
+                AddTile(
+                    label = stringResource(R.string.entry_type_period),
+                    description = stringResource(R.string.day_add_period_description, date),
+                    onClick = { onAdd(EntryKind.PERIOD) },
+                    modifier = Modifier.weight(1f),
+                ) { Icon(SeleneIcons.Drop, contentDescription = null, tint = SeleneColors.Period, modifier = Modifier.size(24.dp)) }
+            }
+            if (state.day.symptoms == null) {
+                AddTile(
+                    label = stringResource(R.string.entry_type_symptoms),
+                    description = stringResource(R.string.day_add_symptoms_description, date),
+                    onClick = { onAdd(EntryKind.SYMPTOMS) },
+                    modifier = Modifier.weight(1f),
+                ) { MoodFace(Mood.GOOD, color = SeleneColors.TextPrimary, size = 24.dp) }
+            }
+            AddTile(
+                label = stringResource(R.string.entry_type_event),
+                description = stringResource(R.string.day_add_event_description, date),
+                onClick = { onAdd(EntryKind.EVENT) },
+                modifier = Modifier.weight(1f),
+            ) { Icon(SeleneIcons.Bolt, contentDescription = null, tint = SeleneColors.Event, modifier = Modifier.size(24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun AddTile(
+    label: String,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: @Composable () -> Unit,
+) {
+    Column(
+        modifier
+            .heightIn(min = 88.dp)
+            .clip(SeleneShapes.Choice)
+            .drawBehind {
+                val stroke = 1.5.dp.toPx()
+                val radius = 14.dp.toPx()
+                drawRoundRect(
+                    color = SeleneColors.Border,
+                    topLeft = Offset(stroke / 2, stroke / 2),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    cornerRadius = CornerRadius(radius - stroke / 2),
+                    style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))),
+                )
+            }
+            .clickable(role = Role.Button, onClick = onClick)
+            .clearAndSetSemantics {
+                contentDescription = description
+                role = Role.Button
+                onClick { onClick(); true }
+            }
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(SeleneIcons.Add, contentDescription = null, tint = SeleneColors.TextSecondary, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            icon()
+        }
+        Text(label, style = MaterialTheme.typography.labelLarge, color = SeleneColors.TextPrimary, textAlign = TextAlign.Center)
     }
 }
 
